@@ -1,6 +1,7 @@
 # BMTC application specification
 
-> Version: v1\
+> Document ID: BMTC-PRODUCT\
+> Version: 1.1.0\
 > Status: Teacher pilot specification with a phased product roadmap\
 > Updated: October 11, 2026\
 > Language: English
@@ -8,6 +9,8 @@
 ## How to use this document
 
 This file combines the documents needed to begin product design and software development. Each section corresponds to a document that would normally be maintained separately, including the Product Brief, PRD, permission matrix, user flows, data model, AI specification, security requirements, test plan, and operating plan.
+
+Detailed engineering design is maintained separately in [BMTC-TECH 1.0.0](technical-specification-v1.md), aligned with this product version. This file remains the authority for product behavior, release scope, and confirmed architecture constraints. Its technical sections provide the high-level context; the technical specification expands implementation details and identifies proposals separately. See the [documentation guide](README.md) and [change log](CHANGELOG.md) for version management.
 
 Decisions use three statuses:
 
@@ -22,6 +25,10 @@ A confirmed product rule does not imply inclusion in the first release. Section 
 ## 1 Product summary
 
 The product is a multi-tenant platform for schools, independent teachers, and families of children who need special education support. It helps users record daily activities, track goals, prepare lesson plans, manage classes, report progress to parents, and run school operations.
+
+BMTC supports special education needs broadly. Autism is one possible context, not the defining focus of the product. Vietnam is the only current market; expansion to other countries and multilingual product support are outside the current scope.
+
+Schools purchase premium capabilities as enterprise or team customers. Freelance teachers and parents can purchase premium capabilities as personal customers. The feature packages, prices, and payment terms remain open.
 
 The platform uses AI to edit notes and draft lesson plans. AI must not diagnose a child, invent facts, or replace professional judgment. All data sent to an external AI service must be de-identified and limited to what the task requires.
 
@@ -190,6 +197,25 @@ Release scope: deferred beyond the teacher pilot. The following rules apply when
 - Basic goals and one monthly report format are included so teachers can reuse daily records during the pilot.
 - School operations beyond the minimum needed to support participating teachers remain later-phase work.
 
+### 2.14 Population and market
+
+- **Confirmed**: the product supports children needing special education support broadly and is not limited to autism.
+- **Confirmed**: Vietnam is the only current market. International expansion and multilingual product support are not current requirements.
+- The English language of this specification does not define the application's interface language.
+- Autism-specific screening references describe possible future tools only. They do not define the full population served by BMTC.
+- Supported ages and the responsibilities of each professional role remain separate decisions. The non-diagnostic rules continue to apply across all support needs.
+
+### 2.15 Paying customers and premium access
+
+- **Confirmed**: schools are enterprise or team customers that pay for premium capabilities in their school workspace.
+- **Confirmed**: freelance teachers and parents are personal customers who can pay for premium capabilities for their own use.
+- Freelance teacher and independent teacher refer to the same user category in this document.
+- Customer type does not replace the role and workspace model. A person can have school membership and a personal workspace under the same account.
+- Premium access controls feature availability and usage limits. Payment does not grant access to a child's records or replace role, assignment, or consent checks.
+- Exact prices, premium features, charging units, billing frequency, and free-access limits remain open. No payment provider is selected by this decision.
+- Whether one personal purchase covers both parent and freelance-teacher use, or requires separate plans, remains open.
+- The handling of existing records, approved reports, and exports after a downgrade or payment failure remains open and must be defined before paid plans launch.
+
 ---
 
 ## 3 Product Brief
@@ -260,6 +286,20 @@ The following product exclusions also remain in force:
 - Sharing all lesson libraries publicly across schools.
 - Ranking children, teachers, or schools with an AI-generated composite score.
 - Importing a guest screening result into an account created later.
+
+### 3.5 Customer and commercial model
+
+| Paying customer | Customer category | Intended premium scope |
+|---|---|---|
+| School or special education center | Enterprise or team | Premium school capabilities used by authorized members within the school workspace |
+| Freelance teacher | Personal | Premium capabilities for independent teaching work |
+| Parent | Personal | Premium capabilities for supporting their child or children |
+
+This customer model applies to the full product. The teacher pilot remains the first delivery phase. Defining a paying customer does not add their entire premium offering to the pilot.
+
+The premium feature matrix and package boundaries must be specified separately. Family access to school-shared reports, sharing between guardians, and the effect of school membership on personal premium access are not settled by the customer categories above.
+
+BMTC product payments are separate from a school's tuition collection or teacher payroll. This commercial decision does not add tuition billing or salary transfers to the platform scope.
 
 ---
 
@@ -698,7 +738,7 @@ Platform Super Admin is a platform role separate from tenant roles. Support acce
 | Payslip | Individual compensation statement | School | Very high |
 | Audit Event | Access and change history | Platform or tenant | High |
 | Support Access Grant | Reasoned, scoped, and time-bounded support access | Platform | Very high |
-| Feature Entitlement | Features and usage limits granted to a tenant | Platform | Medium |
+| Feature Entitlement | Features and usage limits granted under a school team or personal plan; exact personal entitlement scope remains open | Platform | Medium |
 
 ### 10.2 Key and relationship rules
 
@@ -1312,7 +1352,7 @@ The following documents require review by qualified legal, privacy, and professi
 - Finalize pilot permissions, family consent and links, retention, exports, and the incident escalation route.
 - Select the provider for optional AI wording assistance and finalize data terms before enabling it.
 - Complete the threat model, data-protection impact assessment, and backup-restoration exercise.
-- Confirm launch country, supported language, local draft policy, and the applicable data requirements.
+- Apply the confirmed Vietnam market scope; finalize the local draft policy and applicable data requirements. International and multilingual expansion are outside the current scope.
 
 ### Phase 1 Teacher pilot MVP
 
@@ -1361,6 +1401,11 @@ Pilot-critical decisions must be resolved before real-data use. Decisions for de
 
 | Topic | Decision required | Suggested owner |
 |---|---|---|
+| Premium packages | Which features are free or premium for school teams, freelance teachers, and parents | Product and business teams |
+| Pricing and payment terms | Prices, charging units, billing frequency, trials, payment methods, and cancellation or refund terms | Business and finance teams |
+| Personal premium scope | Whether parent and freelance-teacher use share one purchase; whether parent premium covers one account, a family, or a defined number of children | Product and business teams |
+| Team and personal access | How school entitlements interact with personal purchases, and what happens when a member joins or leaves a school | Product and engineering teams |
+| Continuity after payment changes | Access to retained records, approved reports, and exports after expiry, downgrade, payment failure, or school cancellation | Product, business, and legal teams |
 | Screening tool, deferred | Which tool, language version, electronic license, age range, professional owner, follow-up, and referral pathway will be used | Professional and legal teams |
 | Intake questions, deferred | Whether routing questions are needed and who authors, validates, and approves their logic | Professional and product teams |
 | Lesson approval | Whether branch managers approve branch content and school administrators approve school-wide content | School operations |
@@ -1378,7 +1423,7 @@ Pilot-critical decisions must be resolved before real-data use. Decisions for de
 | Pilot measurement | Baseline method, timing, quality review rubric, and final success thresholds | Product and participating teachers |
 | Observation coverage | Which daily activities need records and which structured fields are sufficient | Teachers and professional lead |
 | Pilot report | One report template, evidence visibility, review coverage, and publication timing | Teachers, managers, and parent representatives |
-| Launch scope | Country, supported ages and language, and applicable governance requirements | Product, professional, and legal teams |
+| Age coverage and professional scope | Supported ages, role responsibilities across special education needs, and applicable requirements for the confirmed Vietnam market | Product, professional, and legal teams |
 | Next teacher cohort | Whether independent teachers should be included in the next release and who reviews their reports | Product and professional teams |
 
 ---
@@ -1436,3 +1481,5 @@ Pilot-critical decisions must be resolved before real-data use. Decisions for de
 | 0.3 | October 11, 2026 | Confirmed Java Spring Boot, Spring Modulith, a modular monolith, pragmatic DDD, hexagonal architecture, MVC, in-process CQRS, jOOQ, and Flyway; added Platform Super Admin and controlled support access |
 | 0.4 | October 11, 2026 | Made teachers the primary pilot users; deferred screening; aligned onboarding, scope, requirement mapping, daily workflows, goals, reports, draft recovery, acceptance criteria, metrics, and roadmap around recurring teacher benefit |
 | v1 | October 11, 2026 | Established the teacher pilot specification as the initial BMTC project baseline; retained provisional and open decisions |
+| v1 | October 11, 2026 | Confirmed broad special education support and Vietnam as the current market; defined schools as enterprise or team customers and freelance teachers and parents as personal premium customers; left package and pricing details open |
+| 1.1.0 | October 11, 2026 | Versioned the market and premium-customer clarification, added BMTC-PRODUCT identity, and linked the separate BMTC-TECH 1.0.0 design and documentation versioning guide |
