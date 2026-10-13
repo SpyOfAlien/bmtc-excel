@@ -36,87 +36,239 @@
   --radius: 0.625rem;
 }
 @layer base {
-  * { @apply border-border outline-ring/50; }
-  body { @apply bg-background text-foreground antialiased; font-family: Arial, Helvetica, sans-serif; }
-  h1 { @apply text-2xl font-semibold tracking-tight; }
-  h2 { @apply text-base font-semibold; }
-  p { @apply leading-relaxed; }
-  button:not(:disabled), [role="button"]:not(:disabled) { @apply cursor-pointer; }
-  [hidden] { display: none !important; }
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  h1 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+  h2 {
+    @apply text-base font-semibold;
+  }
+  p {
+    @apply leading-relaxed;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    @apply cursor-pointer;
+  }
+  [hidden] {
+    display: none !important;
+  }
 }
 @layer components {
-  .topbar { @apply flex h-20 items-center gap-4 border-b bg-card px-4 sm:px-8; }
-  .brand { @apply mr-auto flex items-center gap-3 text-base font-semibold; }
-  .brand-mark { @apply grid size-10 place-items-center rounded-xl bg-primary/10 font-serif text-primary; }
-  .brand small { @apply mt-1 block text-[11px] font-normal text-muted-foreground; }
-  .local-badge { @apply hidden sm:inline-flex; }
-  .eyebrow { @apply text-[10px] font-bold tracking-[0.15em] text-muted-foreground; }
-  .two-fields { @apply my-4 grid grid-cols-2 gap-4; }
-  .wide { @apply w-full; }
-  .primary { @apply bg-primary text-primary-foreground hover:bg-primary/90; }
-  .fine { @apply mt-3 text-xs leading-relaxed text-muted-foreground; }
-  .status { @apply my-3 text-sm text-destructive empty:hidden; }
-  .planner-shell { @apply mx-auto min-h-[calc(100dvh-5rem)] max-w-[1920px] p-3 sm:p-6 lg:p-8; }
-  .workspace-heading { @apply mb-6 flex flex-wrap items-center justify-between gap-4; }
-  .workspace-heading h1 { @apply mt-2; }
-  .workspace-heading h1 span { @apply font-normal text-muted-foreground; }
-  .workspace-meta { @apply flex items-center gap-2 text-xs text-muted-foreground; }
-  .workspace-meta > span { @apply hidden max-w-56 truncate lg:block; }
-  .students-bar { @apply mb-5 flex flex-wrap items-center gap-2 border-b; }
-  .student-tabs { @apply m-0 flex min-w-0 flex-1 gap-1 overflow-x-auto; }
-  .student-tab { @apply h-12 shrink-0 gap-2 rounded-b-none border-b-2 border-transparent text-muted-foreground; }
-  .student-tab.active { @apply border-primary bg-accent text-primary; }
-  .student-tab > span:not(.student-avatar) { @apply max-w-52 truncate; }
-  .student-tab small { @apply rounded bg-card px-1.5 text-[10px]; }
-  .student-avatar { @apply grid size-6 place-items-center rounded bg-primary/10 text-[10px]; }
-  .add-student { @apply shrink-0; }
-  .student-card { @apply gap-2 p-4; }
-  .student-card-heading { @apply flex items-center justify-between text-xs text-muted-foreground; }
-  .student-fields { @apply grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-[1.5fr_.6fr_1.2fr_1fr_1.4fr]; }
-  .period-field { @apply md:col-span-2 xl:col-span-1; }
-  .plan-panel { @apply my-6 min-w-0; }
-  .lesson-toolbar { @apply mb-3 flex items-center justify-between gap-4; }
-  .lesson-toolbar p { @apply mt-1 text-xs text-muted-foreground; }
-  .count { @apply ml-2; }
-  .lesson-grid { @apply h-[clamp(300px,38vh,460px)] min-w-0 overflow-hidden rounded-lg; }
-  .plan-footer { @apply mt-2 flex flex-wrap justify-between gap-2 text-[11px] text-muted-foreground; }
-  .reference-panel { @apply gap-0 overflow-hidden py-0; }
-  .reference-topbar { @apply flex flex-wrap items-center justify-between gap-4 border-b bg-muted/50 p-4; }
-  .reference-heading h2 { @apply mb-1 flex flex-wrap items-center gap-3; }
-  .reference-heading p { @apply text-xs text-muted-foreground; }
-  .search-label { @apply w-full sm:w-80; }
-  .search-label span { @apply sr-only; }
-  .reference-body { @apply grid min-w-0 md:grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)]; }
-  .reference-grid { @apply h-64 min-w-0 overflow-hidden; }
-  .reference-detail { @apply h-64 overflow-auto border-t p-5 text-xs md:border-t-0 md:border-l; }
-  .reference-detail h3 { @apply mt-4 mb-1 text-sm font-medium text-primary; }
-  .reference-detail p { @apply whitespace-pre-wrap break-words; }
-  .ref-title { @apply text-sm font-semibold; }
-  .ref-row { @apply mb-2 text-[10px] text-muted-foreground; }
-  .row-order { @apply flex h-full items-center gap-2 text-xs text-muted-foreground; }
-  .order-buttons { @apply flex flex-col gap-1; }
-  .order-buttons button { @apply size-6 p-0; }
-  .row-code { @apply h-full w-full justify-start whitespace-normal p-0 text-left text-xs underline underline-offset-4; }
-  .score-select { @apply my-2 h-8 w-full px-2 text-xs; }
-  .delete-row { @apply size-7 p-0 text-lg text-destructive; }
-  .lesson-notes { @apply my-2 h-[72px] min-h-0 resize-none p-2 text-xs; }
-  .dialog-actions { @apply mt-6 flex justify-end gap-3; }
-  .lesson-options { @apply mt-1 flex max-h-[45vh] flex-col gap-2 overflow-auto; }
-  .lesson-option { @apply h-auto min-h-16 justify-start gap-3 whitespace-normal border bg-muted/40 p-3 text-left; }
-  .lesson-option strong { @apply min-w-14 text-sm; }
-  .lesson-option span { @apply text-xs leading-relaxed; }
-  .lesson-option small { @apply block text-[10px] text-muted-foreground; }
-  .empty-note { @apply text-xs text-muted-foreground; }
-  .file-preview { @apply my-2 break-all rounded-md bg-muted p-3 font-mono text-sm; }
-  .export-save { @apply mt-4; }
-  .download-link { @apply block rounded-md p-3 text-center text-sm; }
-  .toast { @apply fixed bottom-6 left-1/2 z-50 max-w-[85%] -translate-x-1/2 rounded-lg bg-primary px-5 py-3 text-sm text-primary-foreground shadow-lg; }
+  .topbar {
+    @apply flex min-h-20 flex-wrap items-center gap-4 border-b bg-card px-4 py-4 sm:px-8;
+  }
+  .brand {
+    @apply mr-auto flex items-center gap-3 text-base font-semibold;
+  }
+  .brand-mark {
+    @apply grid size-10 place-items-center rounded-xl bg-primary/10 font-serif text-primary;
+  }
+  .brand small {
+    @apply mt-1 block text-[11px] font-normal text-muted-foreground;
+  }
+  .local-badge {
+    @apply hidden sm:inline-flex;
+  }
+  .eyebrow {
+    @apply text-[10px] font-bold tracking-[0.15em] text-muted-foreground;
+  }
+  .two-fields {
+    @apply my-4 grid grid-cols-2 gap-4;
+  }
+  .wide {
+    @apply w-full;
+  }
+  .primary {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90;
+  }
+  .fine {
+    @apply mt-3 text-xs leading-relaxed text-muted-foreground;
+  }
+  .status {
+    @apply my-3 text-sm text-destructive empty:hidden;
+  }
+  .planner-shell {
+    @apply mx-auto min-h-[calc(100dvh-5rem)] max-w-[1920px] p-3 pt-4 sm:p-6 sm:pt-4 lg:p-8 lg:pt-4;
+  }
+  .workspace-heading {
+    @apply flex flex-1 flex-wrap items-center justify-between gap-4;
+  }
+  .workspace-heading h1 {
+    @apply text-lg;
+  }
+  .workspace-heading h1 span {
+    @apply font-normal text-muted-foreground;
+  }
+  .workspace-meta {
+    @apply flex items-center gap-2 text-xs text-muted-foreground;
+  }
+  .workspace-meta > span {
+    @apply hidden max-w-56 truncate lg:block;
+  }
+  .students-bar {
+    @apply mb-5 flex flex-wrap items-center gap-2 border-b;
+  }
+  .student-tabs {
+    @apply m-0 flex min-w-0 max-w-full items-center gap-1 overflow-x-auto;
+  }
+  .student-tab {
+    @apply flex h-12 shrink-0 items-center gap-0 rounded-b-none border-b-2 border-transparent text-muted-foreground;
+  }
+  .student-tab.active {
+    @apply border-primary bg-accent text-primary;
+  }
+  .student-tab small {
+    @apply rounded bg-card px-1.5 text-[10px];
+  }
+  .add-student {
+    @apply shrink-0;
+  }
+  .student-card {
+    @apply gap-2 p-4;
+  }
+  .student-fields {
+    @apply grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-[1.5fr_.6fr_1.2fr_1fr_1.4fr];
+  }
+  .period-field {
+    @apply md:col-span-2 xl:col-span-1;
+  }
+  .plan-panel {
+    @apply my-6 min-w-0;
+  }
+  .lesson-toolbar {
+    @apply mb-3 flex items-center justify-between gap-4;
+  }
+  .lesson-toolbar p {
+    @apply mt-1 text-xs text-muted-foreground;
+  }
+  .count {
+    @apply ml-2;
+  }
+  .lesson-grid {
+    @apply h-[clamp(420px,55vh,680px)] min-w-0 overflow-hidden rounded-lg;
+  }
+  .plan-footer {
+    @apply mt-2 flex flex-wrap justify-between gap-2 text-[11px] text-muted-foreground;
+  }
+  .reference-panel {
+    @apply gap-0 overflow-hidden py-0;
+  }
+  .reference-topbar {
+    @apply flex flex-wrap items-center justify-between gap-4 border-b bg-muted/50 p-4;
+  }
+  .reference-heading h2 {
+    @apply mb-1 flex flex-wrap items-center gap-3;
+  }
+  .reference-heading p {
+    @apply text-xs text-muted-foreground;
+  }
+  .search-label {
+    @apply w-full sm:w-80;
+  }
+  .search-label span {
+    @apply sr-only;
+  }
+  .reference-body {
+    @apply grid min-w-0 ;
+  }
+  .reference-body.has-detail {
+    @apply md:grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)];
+  }
+  .reference-grid {
+    @apply h-[clamp(420px,55vh,680px)] min-w-0 overflow-hidden;
+  }
+  .reference-detail {
+    @apply h-64 overflow-auto border-t p-5 text-xs md:border-t-0 md:border-l;
+  }
+  .reference-detail h3 {
+    @apply mt-4 mb-1 text-sm font-medium text-primary;
+  }
+  .reference-detail p {
+    @apply whitespace-pre-wrap break-words;
+  }
+  .ref-title {
+    @apply text-sm font-semibold;
+  }
+  .ref-row {
+    @apply mb-2 text-[10px] text-muted-foreground;
+  }
+  .row-order {
+    @apply flex h-full items-center gap-2 text-xs text-muted-foreground;
+  }
+  .order-buttons {
+    @apply flex flex-col gap-1;
+  }
+  .order-buttons button {
+    @apply size-6 p-0;
+  }
+  .score-select {
+    @apply my-2 h-8 w-full px-2 text-xs;
+  }
+  .delete-row {
+    @apply size-7 p-0 text-lg text-destructive;
+  }
+  .lesson-notes {
+    @apply my-2 h-[72px] min-h-0 resize-none p-2 text-xs;
+  }
+  .dialog-actions {
+    @apply mt-6 flex justify-end gap-3;
+  }
+  .empty-note {
+    @apply text-xs text-muted-foreground;
+  }
+  .file-preview {
+    @apply my-2 break-all rounded-md bg-muted p-3 font-mono text-sm;
+  }
+  .export-save {
+    @apply mt-4;
+  }
+  .download-link {
+    @apply block rounded-md p-3 text-center text-sm;
+  }
+  .toast {
+    @apply fixed bottom-6 left-1/2 z-50 max-w-[85%] -translate-x-1/2 rounded-lg bg-primary px-5 py-3 text-sm text-primary-foreground shadow-lg;
+  }
 }
 /* AG Grid owns its internal layout; match its cells to the shared UI theme. */
-.ag-cell { white-space: pre-wrap !important; line-height: 1.55 !important; padding-top: 10px !important; padding-bottom: 10px !important; }
-.ag-cell:has(.score-select, .row-code, .delete-row, .row-order, .lesson-notes) { padding-top: 0 !important; padding-bottom: 0 !important; }
-.ag-header-cell-text { font-size: 11px; font-weight: 600; }
-.ag-root-wrapper { border-color: var(--border) !important; }
-.reference-grid .ag-root-wrapper { border: 0; border-radius: 0; }
-.ag-drag-handle { cursor: grab; }
-.ag-drag-handle:active { cursor: grabbing; }
+.ag-cell {
+  white-space: pre-wrap !important;
+  line-height: 1.55 !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+}
+.ag-cell:has(
+  .score-select,
+  .manual-score,
+  .manual-lesson-field,
+  .lesson-code-cell,
+  .delete-row,
+  .row-order,
+  .lesson-notes
+) {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+.ag-header-cell-text {
+  font-size: 11px;
+  font-weight: 600;
+}
+.ag-root-wrapper {
+  border-color: var(--border) !important;
+}
+.reference-grid .ag-root-wrapper {
+  border: 0;
+  border-radius: 0;
+}
+.ag-drag-handle {
+  cursor: grab;
+}
+.ag-drag-handle:active {
+  cursor: grabbing;
+}

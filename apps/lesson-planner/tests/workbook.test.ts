@@ -1,7 +1,8 @@
+import { emptyManualFields } from "../src/lib/lesson-fields";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
-import { strFromU8, unzipSync, zipSync } from "fflate";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { exportWorkbook, normalize, readTemplate, sheetNames, validatePlans } from "../src/lib/workbook";
 import type { ChildDraft, Template } from "../src/lib/workbook";
 import { nextFilename, validPeriod } from "../src/lib/files";
@@ -18,7 +19,7 @@ function child(name = "Bé thử", codes = ["A5"]): ChildDraft {
       const lesson = template.lessons.get(normalize(code));
       const score = lesson?.scores.at(-1);
       if (!score) throw new Error(`Missing test fixture ${code}`);
-      return { id: String(i), code, scoreId: score.id, notes: "" };
+      return { id: String(i), code, scoreId: score.id, notes: "", manual: emptyManualFields() };
     }) };
 }
 function xml(bytes: Uint8Array | undefined) {
@@ -51,6 +52,24 @@ describe("real workbook parsing", () => {
     expect(row?.name).toBe(template.lessons.get("a5")?.name);
     expect(template.reference.find(r => r.row === 2019)?.criteria).toBe(template.reference.find(r => r.row === 2018)?.criteria);
   });
+  it("imports a reference sheet with no score header or score values", () => {
+    const parts = unzipSync(source), workbook = xml(parts["xl/workbook.xml"]);
+    const referenceSheet = elements(workbook, "sheet").find(sheet => normalize(sheet.getAttribute("name") || "") === "kodcxoa");
+    const relationship = Array.from(xml(parts["xl/_rels/workbook.xml.rels"]).documentElement.children).find(relation => relation.getAttribute("Id") === referenceSheet?.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id"));
+    const target = relationship?.getAttribute("Target");
+    if (!target) throw new Error("Missing reference fixture");
+    const path = target.startsWith("/") ? target.slice(1) : `xl/${target}`;
+    const reference = xml(parts[path]);
+    for (const cell of elements(reference, "c")) if (/^D\d+$/.test(cell.getAttribute("r") || "")) { cell.replaceChildren(); cell.removeAttribute("t"); }
+    parts[path] = strToU8(new XMLSerializer().serializeToString(reference));
+    const unscoredTemplate = readTemplate(zipSync(parts));
+    expect(unscoredTemplate.lessons.size).toBe(template.lessons.size);
+    expect(Array.from(unscoredTemplate.lessons.values()).every(lesson => !lesson.scores.length)).toBe(true);
+    expect(unscoredTemplate.lessons.get("a5")?.criteria).toBe(template.lessons.get("a5")?.criteria);
+    const plan = child();
+    plan.lessons = plan.lessons.map(row => ({ ...row, scoreId: "", manual: { ...emptyManualFields(), score: "2 / 4" } }));
+    expect(validatePlans(unscoredTemplate, [plan])[0]?.lessons[0]?.fields.score).toBe("2 / 4");
+  });
   it("normalizes code case and whitespace and rejects duplicate lessons", () => {
     expect(validatePlans(template, [child("An", [" a 5 "])])[0]?.lessons[0]?.lesson.code).toBe("A5");
     expect(() => validatePlans(template, [child("An", ["A5", " a 5 "])])).toThrow("đã được chọn");
@@ -59,7 +78,7 @@ describe("real workbook parsing", () => {
     expect(() => validatePlans(template, [child(" ")])).toThrow("họ tên");
     expect(() => validatePlans(template, [child("An", [])])).toThrow("cần từ 1");
     const wrong = child();
-    wrong.lessons = [{ id: "1", code: "A5", scoreId: "3", notes: "" }];
+    wrong.lessons = [{ id: "1", code: "A5", scoreId: "3", notes: "", manual: emptyManualFields() }];
     expect(() => validatePlans(template, [wrong])).toThrow("điểm cần đạt");
   });
   it("rejects invalid archives and mismatched templates", () => {
@@ -71,6 +90,28 @@ describe("real workbook parsing", () => {
 });
 
 describe("values-only multi-child export", () => {
+  it("exports free text and manual scores only for missing reference content", async () => {
+    const original = template.lessons.get("a5");
+    if (!original) throw new Error("Missing A5 fixture");
+    const incomplete = { ...template, lessons: new Map(template.lessons) };
+    incomplete.lessons.set("a5", { ...original, name: "", objective: "", instruction: "", criteria: "", scores: [] });
+    const plan = child("Thủ công");
+    plan.lessons = [{ id: "manual", code: "A5", scoreId: "", notes: "Ghi chú", manual: {
+      name: "=Tên & <thủ công>", objective: "Mục tiêu mới", instruction: "Hướng dẫn mới\nDòng 2", criteria: "Tiêu chí mới", score: "2 / 4",
+    } }];
+    const regular = child("Tham khảo", ["A1"]);
+    regular.lessons = regular.lessons.map(row => ({ ...row, manual: { name: "Không ghi đè", objective: "", instruction: "", criteria: "", score: "99" } }));
+    const files = unzipSync(await exportWorkbook(incomplete, [plan, regular]));
+    const manualSheet = xml(files["xl/worksheets/sheet1.xml"]), referenceSheet = xml(files["xl/worksheets/sheet2.xml"]);
+    expect(["A9", "B9", "C9", "D9", "E9", "F9", "G9"].map(coord => value(manualSheet, coord))).toEqual(["A5", "=Tên & <thủ công>", "Mục tiêu mới", "Hướng dẫn mới\nDòng 2", "2 / 4", "Tiêu chí mới", "Ghi chú"]);
+    expect(elements(manualSheet, "f")).toHaveLength(0);
+    expect(value(referenceSheet, "B9")).toBe(template.lessons.get("a1")?.name);
+    expect(value(referenceSheet, "E9")).toBe("1");
+    plan.lessons = plan.lessons.map(row => ({ ...row, manual: { ...row.manual, score: " " } }));
+    expect(() => validatePlans(incomplete, [plan])).toThrow("chưa nhập điểm");
+    plan.lessons = plan.lessons.map(row => ({ ...row, manual: { ...row.manual, score: "2", objective: "\u0000" } }));
+    expect(() => validatePlans(incomplete, [plan])).toThrow("ký tự không hợp lệ");
+  });
   it("exports reordered lessons with their scores and keeps other children independent", async () => {
     const first = child("An", ["A1", "A5"]);
     const second = child("Bình", ["A1", "A5"]);

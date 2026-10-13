@@ -1,4 +1,5 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+import { resolveLessonFields } from "./lesson-fields";
 
 const S = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -21,6 +22,7 @@ export interface Lesson {
   name: string;
   objective: string;
   instruction: string;
+  criteria: string;
   row: number;
   scores: Score[];
 }
@@ -46,7 +48,9 @@ export interface Template {
   defaults: { teacher: string; manager: string };
   center: string;
 }
-export interface DraftLesson { id: string; code: string; scoreId: string; notes: string }
+export interface ManualLessonFields { name: string; objective: string; instruction: string; criteria: string; score: string }
+export type ResolvedLessonFields = Omit<ManualLessonFields, "score"> & { score: CellValue };
+export interface DraftLesson { id: string; code: string; scoreId: string; notes: string; manual: ManualLessonFields }
 export interface ChildDraft {
   id: string;
   name: string;
@@ -57,7 +61,7 @@ export interface ChildDraft {
   lessons: DraftLesson[];
 }
 export interface PlannedChild extends Omit<ChildDraft, "lessons"> {
-  lessons: { lesson: Lesson; score: Score; notes: string }[];
+  lessons: { lesson: Lesson; fields: ResolvedLessonFields; notes: string }[];
 }
 
 export const normalize = (value: string) => value.normalize("NFC").toLocaleLowerCase("vi").replace(/\s/g, "");
@@ -224,7 +228,8 @@ export function readTemplate(data: Uint8Array): Template {
     if (normalize(text(values.get(`${String.fromCharCode(65 + index)}8`))) !== normalize(label)) throw new Error("KHGDCN không có đúng cột A:F tại hàng 8 của mẫu.");
   }
   for (const [index, label] of ["Bài số", "Tên bài", "Mục tiêu và hướng dẫn", "Thang điểm", "Cách chấm điểm", "Hướng dẫn"].entries()) {
-    if (normalize(text(raw.get(`${String.fromCharCode(65 + index)}2`))) !== normalize(label)) throw new Error("Ko dc xoa không có đúng cột A:F tại hàng 2.");
+    const header = normalize(text(raw.get(`${String.fromCharCode(65 + index)}2`)));
+    if (header !== normalize(label) && !(index === 3 && !header)) throw new Error("Ko dc xoa không có đúng cột A:F tại hàng 2.");
   }
   const groups: Lesson[] = [], referenceRows: ReferenceRow[] = [];
   let current: Lesson | null = null;
@@ -234,7 +239,7 @@ export function readTemplate(data: Uint8Array): Template {
     const code = text(raw.get(`A${row}`)).trim();
     if (["số", "bàisố", "stt"].includes(normalize(code))) { current = null; continue; }
     if (code) {
-      current = { code, name: get("B"), objective: get("C"), instruction: get("F"), row, scores: [] };
+      current = { code, name: get("B"), objective: get("C"), instruction: get("F"), criteria: get("E"), row, scores: [] };
       groups.push(current);
     }
     const source = get("D");
@@ -242,6 +247,7 @@ export function readTemplate(data: Uint8Array): Template {
       referenceRows.push({ row, code: get("A") || current?.code || "", name: get("B") || current?.name || "",
         objective: get("C") || current?.objective || "", score: source, criteria: get("E"), instruction: get("F") || current?.instruction || "" });
     }
+    if (current && !current.criteria) current.criteria = get("E");
     if (!current || !source || current.scores.some(s => normalize(s.source) === normalize(source))) continue;
     const value = scoreValue(current.code, expanded.get(`D${row}`) ?? "");
     current.scores.push({ id: String(row), label: text(value), source, value, criteria: get("E"), row, dateLike: /^\d{4}-\d{2}-\d{2}$/.test(source) });
@@ -258,7 +264,7 @@ export function readTemplate(data: Uint8Array): Template {
   const dates = lessonList.reduce((sum, l) => sum + l.scores.filter(s => s.dateLike).length, 0);
   const unscored = lessonList.filter(l => !l.scores.length).length;
   if (dates) warnings.push(`${dates} thang điểm được Excel lưu thành ngày. Giữ nguyên ngày gốc, không tự suy đoán thành khoảng điểm.`);
-  if (unscored) warnings.push(`${unscored} bài không có thang điểm. Chỉ tham khảo, chưa thể đưa vào kế hoạch.`);
+  if (unscored) warnings.push(`${unscored} bài chưa có thang điểm. Có thể nhập điểm và các nội dung còn thiếu trực tiếp.`);
   const blocked = new Set<number>();
   for (const { start, end } of merges(sheet)) {
     if (start.col > 6) continue;
@@ -288,10 +294,12 @@ export function validatePlans(template: Template, children: ChildDraft[]): Plann
       if (!lesson) throw new Error(`${name}, bài ${rowIndex + 1}: chưa chọn bài số hợp lệ.`);
       if (used.has(key)) throw new Error(`${name}: bài ${lesson.code} đã được chọn.`);
       used.add(key);
-      const score = lesson.scores.find(s => s.id === row.scoreId);
-      if (!score) throw new Error(`${name}, bài ${rowIndex + 1}: chưa chọn điểm cần đạt hợp lệ.`);
-      if (row.notes.length > 32767 || /[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(row.notes)) throw new Error(`${name}, bài ${rowIndex + 1}: ghi chú quá dài hoặc chứa ký tự không hợp lệ.`);
-      return { lesson, score, notes: row.notes };
+      const score = lesson.scores.find(s => s.id === row.scoreId) ?? null;
+      if (lesson.scores.length ? !score : !row.manual.score.trim()) throw new Error(`${name}, bài ${rowIndex + 1}: chưa ${lesson.scores.length ? "chọn" : "nhập"} điểm cần đạt hợp lệ.`);
+      for (const value of [row.notes, ...Object.values(row.manual)]) {
+        if (value.length > 32767 || /[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value)) throw new Error(`${name}, bài ${rowIndex + 1}: nội dung quá dài hoặc chứa ký tự không hợp lệ.`);
+      }
+      return { lesson, fields: resolveLessonFields(lesson, score, row.manual), notes: row.notes };
     });
     return { ...child, name, lessons };
   });
@@ -398,8 +406,8 @@ export async function exportWorkbook(template: Template, drafts: ChildDraft[]): 
     for (const [i, planned] of child.lessons.entries()) {
       const row = template.slots[i];
       if (row === undefined) throw new Error("Vượt số hàng trong mẫu.");
-      const { lesson, score, notes } = planned;
-      [lesson.code, lesson.name, lesson.objective, lesson.instruction, score.value, score.criteria].forEach((value, col) => setCell(`${String.fromCharCode(65 + col)}${row}`, value));
+      const { lesson, fields, notes } = planned;
+      [lesson.code, fields.name, fields.objective, fields.instruction, fields.score, fields.criteria].forEach((value, col) => setCell(`${String.fromCharCode(65 + col)}${row}`, value));
       if (notes) setCell(`G${row}`, notes);
     }
     const occupied = new Set(template.slots.slice(0, child.lessons.length));

@@ -1,10 +1,11 @@
+import { emptyManualFields } from "../src/lib/lesson-fields";
 import { describe, expect, it } from "vitest";
 import { moveLesson } from "../src/lib/lesson-order";
 
 const rows = [
-  { id: "a", code: "A1", scoreId: "one", notes: "Ghi chú A1" },
-  { id: "b", code: "A5", scoreId: "two", notes: "" },
-  { id: "c", code: "A6", scoreId: "three", notes: "" },
+  { id: "a", code: "A1", scoreId: "one", notes: "Ghi chú A1", manual: emptyManualFields() },
+  { id: "b", code: "A5", scoreId: "two", notes: "", manual: emptyManualFields() },
+  { id: "c", code: "A6", scoreId: "three", notes: "", manual: emptyManualFields() },
 ];
 
 describe("lesson order", () => {
