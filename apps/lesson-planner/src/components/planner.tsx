@@ -507,6 +507,7 @@ function Workspace({
       {
         headerName: "Thứ tự",
         width: 116,
+        suppressSizeToFit: true,
         pinned: "left",
         rowDrag: (params) => params.data?.kind === "lesson",
         valueGetter: (params) => lessonRow(params.data)?.index,
@@ -546,6 +547,10 @@ function Workspace({
       {
         headerName: "Bài số *",
         width: 180,
+        minWidth: 180,
+        maxWidth: 180,
+        resizable: false,
+        suppressSizeToFit: true,
         pinned: "left",
         valueGetter: (params) => {
           const data = lessonRow(params.data);
@@ -571,6 +576,10 @@ function Workspace({
       {
         headerName: "Điểm cần đạt *",
         width: 130,
+        minWidth: 130,
+        maxWidth: 130,
+        resizable: false,
+        suppressSizeToFit: true,
         pinned: "left",
         valueGetter: (params) => {
           const data = lessonRow(params.data);
@@ -652,6 +661,7 @@ function Workspace({
       {
         headerName: "",
         width: 42,
+        suppressSizeToFit: true,
         pinned: "right",
         valueGetter: (params) => lessonRow(params.data)?.index,
         cellRenderer: (params: ICellRendererParams<TableRow>) => {
@@ -685,9 +695,9 @@ function Workspace({
   ]);
   const referenceColumns = useMemo<ColDef<ReferenceRow>[]>(
     () => [
-      { field: "code", headerName: "Bài số", width: 92 },
+      { field: "code", headerName: "Bài số", width: 92, minWidth: 92, maxWidth: 92, resizable: false, suppressSizeToFit: true },
       { field: "name", headerName: "Tên bài", width: 180, wrapText: true },
-      { field: "score", headerName: "Thang điểm", width: 130 },
+      { field: "score", headerName: "Thang điểm", width: 130, minWidth: 130, maxWidth: 130, resizable: false, suppressSizeToFit: true },
       { field: "objective", headerName: "Mục tiêu", width: 230 },
       { field: "criteria", headerName: "Cách chấm điểm", width: 250 },
       { field: "instruction", headerName: "Hướng dẫn", width: 270 },
@@ -758,9 +768,8 @@ function Workspace({
               </div>
             ))}
             <Button
-              variant="default"
-              size="icon"
-              className="add-student size-8 text-xl leading-none"
+              variant="ghost"
+              className="student-tab add-student h-12 gap-4 rounded-b-none"
               aria-label="Thêm học sinh"
               title="Thêm học sinh"
               disabled={children.length >= 100}
@@ -772,7 +781,8 @@ function Workspace({
                 setActiveIndex(children.length);
               }}
             >
-              +
+              <span>Thêm học sinh</span>
+              <span className="text-xl leading-none" aria-hidden="true">+</span>
             </Button>
           </nav>
         </div>
@@ -843,6 +853,10 @@ function Workspace({
               theme={theme}
               rowData={rowData}
               columnDefs={columns}
+              onFirstDataRendered={(event) => event.api.sizeColumnsToFit()}
+              onGridSizeChanged={(event) => {
+                if (event.clientWidth > 0) event.api.sizeColumnsToFit();
+              }}
               rowHeight={96}
               headerHeight={42}
               suppressCellFocus
@@ -914,6 +928,10 @@ function Workspace({
                 theme={theme}
                 rowData={template.reference}
                 columnDefs={referenceColumns}
+              onFirstDataRendered={(event) => event.api.sizeColumnsToFit()}
+              onGridSizeChanged={(event) => {
+                if (event.clientWidth > 0) event.api.sizeColumnsToFit();
+              }}
                 rowHeight={65}
                 headerHeight={38}
                 defaultColDef={{
