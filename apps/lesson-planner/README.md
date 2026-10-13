@@ -42,8 +42,9 @@ Only `out/` is deployed. Templates in the repository's `ref/` directory, test da
 1. Import a `.xlsx` template containing `KHGDCN` and `Ko dc xoa`. The plan starts with the current month/year; these can be changed when exporting.
 2. Enter the child's name and optional age, teacher, QLCM and month/week text.
 3. Click `Thêm bài` in the table's final row, or in its center when empty. Search directly in the `Bài số` cell. Select several lessons with the checkboxes and click `Áp dụng`; each selected lesson becomes its own row, in selection order. New rows appear immediately after the edited row. Choose a target score from the reference, or type it if that lesson has no score options. Existing reference values load automatically and stay read-only; missing names, objectives, instructions and criteria become free-text fields. All manual content exports with the lesson. The same lesson cannot appear twice for one child. Drag a row's handle or use its up/down buttons to reorder lessons; manual content, scores and notes move with their lessons and Excel follows this order.
-4. Add further children. A new child keeps the previous age/teacher/QLCM/period, with an empty name and lesson list.
-5. Export one workbook containing one sheet per child in entry order. Names are sanitized and made unique for Excel; the child's displayed name stays intact.
+4. Use `Nhập kế hoạch Excel` in the header to import an existing `.xlsx` plan using the same A:F headers at row 8, including files exported by this app. Each plan sheet becomes a student tab with metadata, lessons, scores, and notes in their original order. Imported content remains editable and is preserved on export. Import adds students to the current plans, replacing the initial unnamed empty tab. Codes must exist in the currently loaded reference, and the combined plans must stay within the student and lesson limits.
+5. Add further children. A new child keeps the previous age/teacher/QLCM/period, with an empty name and lesson list.
+6. Export one workbook containing one sheet per child in entry order. Names are sanitized and made unique for Excel; the child's displayed name stays intact.
 
 The `Ko dc xoa` table remains searchable and read-only. Blank continuation rows show their parent lesson's context for easier browsing. All original reference rows remain available.
 
@@ -57,7 +58,7 @@ The app verifies the original column layout: KHGDCN A8:F8 and Ko dc xoa A2:F2. I
 
 The original template merges E23:E26. Export skips rows 24–26 so separate lessons keep separate scores without changing the merge. These unused rows keep normal height. Very long text can still be clipped in Excel.
 
-Score keys such as `A5.2` export as `2`. Other score values remain as provided. The sample template has 54 scores stored as dates; these stay as ISO date text rather than guessing an intended range. Lessons with no score options accept a manual target score. A blank `Thang điểm` header in D2 is allowed, while the remaining reference columns retain their original positions. Missing reference fields accept free text; existing values always take precedence. Duplicate source codes use the first group, matching the template's first-match lookup behavior.
+Score keys such as `A5.2` export as `2`. Other score values remain as provided. The sample template has 54 scores stored as dates; these stay as ISO date text rather than guessing an intended range. Lessons with no score options accept a manual target score. A blank `Thang điểm` header in D2 is allowed, while the remaining reference columns retain their original positions. Missing reference fields accept free text; existing values take precedence for lessons selected from the reference. Imported plan rows keep their Excel content and allow edits to every content field. Duplicate source codes use the first group, matching the template's first-match lookup behavior.
 
 Supports .xlsx files up to 30 MB and 150 MB expanded, up to 100 children, and the template's available lesson rows. Macros, external relationships, and embedded objects other than images in KHGDCN are rejected.
 

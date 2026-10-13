@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
-import { exportWorkbook, normalize, readTemplate, sheetNames, validatePlans } from "../src/lib/workbook";
+import { exportWorkbook, importPlans, normalize, readTemplate, sheetNames, validatePlans } from "../src/lib/workbook";
 import type { ChildDraft, Template } from "../src/lib/workbook";
 import { nextFilename, validPeriod } from "../src/lib/files";
 import { moveLesson } from "../src/lib/lesson-order";
@@ -221,5 +221,50 @@ describe("save names", () => {
     expect(validPeriod(0, 2026)).toBe(false);
     expect(validPeriod(13, 2026)).toBe(false);
     expect(validPeriod(1.5, 2026)).toBe(false);
+  });
+});
+
+
+function required<T>(value: T | undefined): T {
+  if (value === undefined) throw new Error("Missing test fixture value");
+  return value;
+}
+
+describe("import existing plans", () => {
+  it("imports every student, their metadata, lessons, scores and notes in order", async () => {
+    const first = child("An", ["A5", "A1"]), second = child("Bình", ["A5"]);
+    required(first.lessons[0]).notes = "Ghi chú cần giữ";
+    const imported = importPlans(await exportWorkbook(template, [first, second]), template);
+    expect(imported.map(plan => plan.name)).toEqual(["An", "Bình"]);
+    expect(required(imported[0])).toMatchObject({ age: first.age, teacher: first.teacher, manager: first.manager, period: first.period });
+    expect(required(imported[0]).lessons.map(row => row.code)).toEqual(["A5", "A1"]);
+    expect(required(imported[0]).lessons[0]).toMatchObject({ origin: "excel", notes: "Ghi chú cần giữ" });
+    const original = required(required(validatePlans(template, [first])[0]).lessons[0]);
+    expect(required(required(imported[0]).lessons[0]).manual).toEqual({ ...original.fields, score: String(original.fields.score) });
+  });
+  it("keeps imported edits when exporting and importing again", async () => {
+    const imported = importPlans(await exportWorkbook(template, [child()]), template);
+    const row = required(required(imported[0]).lessons[0]);
+    row.manual = { name: "Tên đã sửa", objective: "Mục tiêu đã sửa", instruction: "Hướng dẫn đã sửa", criteria: "Tiêu chí đã sửa", score: "2 / 4" };
+    row.notes = "Ghi chú đã sửa";
+    const restored = importPlans(await exportWorkbook(template, imported), template);
+    expect(required(required(restored[0]).lessons[0]).manual).toEqual(row.manual);
+    expect(required(required(restored[0]).lessons[0]).notes).toBe(row.notes);
+  });
+  it("rejects unknown codes and files without plan sheets", async () => {
+    const parts = unzipSync(await exportWorkbook(template, [child()]));
+    const sheet = xml(parts["xl/worksheets/sheet1.xml"]);
+    const code = elements(sheet, "c").find(cell => cell.getAttribute("r") === "A9");
+    if (!code) throw new Error("Missing code fixture");
+    code.setAttribute("t", "inlineStr"); code.replaceChildren();
+    const inline = sheet.createElementNS(S, "is"), text = sheet.createElementNS(S, "t");
+    text.textContent = "UNKNOWN999"; inline.append(text); code.append(inline);
+    parts["xl/worksheets/sheet1.xml"] = strToU8(new XMLSerializer().serializeToString(sheet));
+    expect(() => importPlans(zipSync(parts), template)).toThrow("không có trong mẫu");
+    const header = elements(sheet, "c").find(cell => cell.getAttribute("r") === "A8");
+    header?.replaceChildren();
+    parts["xl/worksheets/sheet1.xml"] = strToU8(new XMLSerializer().serializeToString(sheet));
+    expect(() => importPlans(zipSync(parts), template)).toThrow("Không tìm thấy sheet kế hoạch");
+    expect(() => importPlans(new Uint8Array([1, 2, 3]), template)).toThrow();
   });
 });

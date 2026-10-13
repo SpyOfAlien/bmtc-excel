@@ -11,6 +11,7 @@ import type { ColDef, ICellRendererParams } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import {
   exportWorkbook,
+  importPlans,
   MAX_UPLOAD,
   normalize,
   readTemplate,
@@ -120,9 +121,6 @@ function Header({
   return (
     <header className="topbar">
       {children}
-      <Badge variant="secondary" className="local-badge hidden sm:inline-flex">
-        Dữ liệu ở trên thiết bị
-      </Badge>
       <Button
         variant="default"
         className=""
@@ -295,9 +293,13 @@ function Workspace({
   restart: () => void;
 }) {
   const { template } = loaded;
+  const importInput = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
   const [children, setChildren] = useState<ChildDraft[]>(() => [
     freshChild(template, loaded.month, loaded.year),
   ]);
+  const childrenRef = useRef(children);
+  childrenRef.current = children;
   const [activeIndex, setActiveIndex] = useState(0);
   const [period, setPeriod] = useState({
     month: loaded.month,
@@ -492,7 +494,11 @@ function Workspace({
           return (
             data && (
               <LessonFieldCell
-                source={lessonReferences(data.lesson, data.score)[field]}
+                source={
+                  data.origin === "excel"
+                    ? ""
+                    : lessonReferences(data.lesson, data.score)[field]
+                }
                 value={data.manual[field]}
                 label={`${label} bài ${data.index}`}
                 disabled={!data.lesson}
@@ -588,7 +594,10 @@ function Workspace({
         cellRenderer: (params: ICellRendererParams<TableRow>) => {
           const data = lessonRow(params.data);
           if (!data) return null;
-          if (data.lesson && !data.lesson.scores.length)
+          if (
+            data.lesson &&
+            (data.origin === "excel" || !data.lesson.scores.length)
+          )
             return (
               <Input
                 className="manual-score my-2 h-8 px-2 text-xs"
@@ -695,9 +704,25 @@ function Workspace({
   ]);
   const referenceColumns = useMemo<ColDef<ReferenceRow>[]>(
     () => [
-      { field: "code", headerName: "Bài số", width: 92, minWidth: 92, maxWidth: 92, resizable: false, suppressSizeToFit: true },
+      {
+        field: "code",
+        headerName: "Bài số",
+        width: 92,
+        minWidth: 92,
+        maxWidth: 92,
+        resizable: false,
+        suppressSizeToFit: true,
+      },
       { field: "name", headerName: "Tên bài", width: 180, wrapText: true },
-      { field: "score", headerName: "Thang điểm", width: 130, minWidth: 130, maxWidth: 130, resizable: false, suppressSizeToFit: true },
+      {
+        field: "score",
+        headerName: "Thang điểm",
+        width: 130,
+        minWidth: 130,
+        maxWidth: 130,
+        resizable: false,
+        suppressSizeToFit: true,
+      },
       { field: "objective", headerName: "Mục tiêu", width: 230 },
       { field: "criteria", headerName: "Cách chấm điểm", width: 250 },
       { field: "instruction", headerName: "Hướng dẫn", width: 270 },
@@ -705,6 +730,42 @@ function Workspace({
     ],
     [],
   );
+  async function importPlanFile(file: File) {
+    if (importing) return;
+    setImporting(true);
+    try {
+      if (!/\.xlsx$/i.test(file.name)) throw new Error("Chỉ nhận tệp .xlsx.");
+      if (file.size > MAX_UPLOAD)
+        throw new Error("Tệp .xlsx không được lớn hơn 30 MB.");
+      const imported = importPlans(
+        new Uint8Array(await file.arrayBuffer()),
+        template,
+      );
+      const currentChildren = childrenRef.current;
+      const existing =
+        currentChildren.length === 1 &&
+        !currentChildren[0]?.name &&
+        !currentChildren[0]?.lessons.length
+          ? []
+          : currentChildren;
+      if (existing.length + imported.length > 100)
+        throw new Error(
+          "Tổng số học sinh sau khi nhập không được vượt quá 100.",
+        );
+      setChildren([...existing, ...imported]);
+      setActiveIndex(existing.length);
+      setEditingRow(null);
+      setDetail(null);
+      setToast(
+        `Đã nhập ${imported.length} học sinh và ${imported.reduce((sum, child) => sum + child.lessons.length, 0)} bài học từ ${file.name}.`,
+      );
+    } catch (error) {
+      setToast(message(error));
+    } finally {
+      setImporting(false);
+      if (importInput.current) importInput.current.value = "";
+    }
+  }
   function openExport() {
     try {
       validatePlans(template, children);
@@ -723,7 +784,6 @@ function Workspace({
             <span> / {period.year}</span>
           </h1>
           <div className="workspace-meta">
-            <span title={loaded.filename}>{loaded.filename}</span>
             <Button
               variant="ghost"
               className="text-xs text-primary"
@@ -732,10 +792,27 @@ function Workspace({
               Lưu ý từ mẫu
               {template.warnings.length ? ` (${template.warnings.length})` : ""}
             </Button>
+            <Button
+              disabled={importing}
+              onClick={() => importInput.current?.click()}
+            >
+              {importing ? "Đang nhập…" : "Nhập kế hoạch Excel"}
+            </Button>
             <Button onClick={() => setConfirmation("restart")}>Đổi mẫu</Button>
           </div>
         </div>
       </Header>
+      <input
+        ref={importInput}
+        type="file"
+        accept=".xlsx"
+        hidden
+        aria-label="Chọn file kế hoạch Excel"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) void importPlanFile(file);
+        }}
+      />
       <main className="planner-shell">
         <div className="students-bar">
           <nav className="student-tabs" aria-label="Danh sách học sinh">
@@ -782,7 +859,9 @@ function Workspace({
               }}
             >
               <span>Thêm học sinh</span>
-              <span className="text-xl leading-none" aria-hidden="true">+</span>
+              <span className="text-xl leading-none" aria-hidden="true">
+                +
+              </span>
             </Button>
           </nav>
         </div>
@@ -928,10 +1007,10 @@ function Workspace({
                 theme={theme}
                 rowData={template.reference}
                 columnDefs={referenceColumns}
-              onFirstDataRendered={(event) => event.api.sizeColumnsToFit()}
-              onGridSizeChanged={(event) => {
-                if (event.clientWidth > 0) event.api.sizeColumnsToFit();
-              }}
+                onFirstDataRendered={(event) => event.api.sizeColumnsToFit()}
+                onGridSizeChanged={(event) => {
+                  if (event.clientWidth > 0) event.api.sizeColumnsToFit();
+                }}
                 rowHeight={65}
                 headerHeight={38}
                 defaultColDef={{
@@ -953,7 +1032,9 @@ function Workspace({
             {detail && (
               <div className="reference-detail">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="ref-row mb-0">Hàng {detail.row} · Ko dc xoa</div>
+                  <div className="ref-row mb-0">
+                    Hàng {detail.row} · Ko dc xoa
+                  </div>
                   <Button
                     variant="ghost"
                     size="icon"

@@ -50,7 +50,7 @@ export interface Template {
 }
 export interface ManualLessonFields { name: string; objective: string; instruction: string; criteria: string; score: string }
 export type ResolvedLessonFields = Omit<ManualLessonFields, "score"> & { score: CellValue };
-export interface DraftLesson { id: string; code: string; scoreId: string; notes: string; manual: ManualLessonFields }
+export interface DraftLesson { id: string; code: string; scoreId: string; notes: string; manual: ManualLessonFields; origin?: "excel" }
 export interface ChildDraft {
   id: string;
   name: string;
@@ -188,8 +188,7 @@ function readAssets(parts: Map<string, Uint8Array>, sheetPath: string) {
   return assets;
 }
 
-/** The file is parsed on the user's device. No request contains workbook data. */
-export function readTemplate(data: Uint8Array): Template {
+function unpackWorkbook(data: Uint8Array): Map<string, Uint8Array> {
   if (!data.length || data.length > MAX_UPLOAD) throw new Error("Hãy chọn tệp .xlsx tối đa 30 MB.");
   let expandedSize = 0;
   const filenames = new Set<string>();
@@ -204,12 +203,11 @@ export function readTemplate(data: Uint8Array): Template {
     } })));
   } catch { throw new Error("Không đọc được tệp .xlsx. Workbook phải không có mật khẩu và tối đa 150 MB sau giải nén."); }
   if (parts.has("xl/vbaProject.bin")) throw new Error("Chỉ hỗ trợ .xlsx không chứa macro.");
-  const workbook = xmlPart(parts, "xl/workbook.xml"), relations = xmlPart(parts, "xl/_rels/workbook.xml.rels");
-  const targets = new Map(descendants(relations, "Relationship", P).map(r => [r.getAttribute("Id"), targetPath("xl/workbook.xml", r.getAttribute("Target") || "")]));
-  const sheets = new Map(descendants(workbook, "sheet").map(s => [normalize(s.getAttribute("name") || ""), targets.get(s.getAttributeNS(R, "id"))]));
-  const sheetPath = sheets.get("khgdcn"), refPath = sheets.get("kodcxoa");
-  if (!sheetPath || !refPath) throw new Error("Mẫu phải có hai sheet KHGDCN và Ko dc xoa.");
-  const sheet = xmlPart(parts, sheetPath), reference = xmlPart(parts, refPath);
+  return parts;
+}
+
+function workbookCellReader(parts: Map<string, Uint8Array>) {
+  const workbook = xmlPart(parts, "xl/workbook.xml");
   const strings = parts.has("xl/sharedStrings.xml") ? descendants(xmlPart(parts, "xl/sharedStrings.xml"), "si").map(si => descendants(si, "t").map(t => t.textContent || "").join("")) : [];
   const styles = xmlPart(parts, "xl/styles.xml");
   const formats = new Map(descendants(styles, "numFmt").map(f => [Number(f.getAttribute("numFmtId")), f.getAttribute("formatCode") || ""]));
@@ -222,7 +220,20 @@ export function readTemplate(data: Uint8Array): Template {
     if (id >= 14 && id <= 22 || id >= 45 && id <= 47 || /[yd]/i.test(code)) dateStyles.add(index);
   });
   const epoch = descendants(workbook, "workbookPr")[0]?.getAttribute("date1904") === "1" ? Date.UTC(1904, 0, 1) : Date.UTC(1899, 11, 30);
-  const values = readCells(sheet, strings, dateStyles, epoch), raw = readCells(reference, strings, dateStyles, epoch);
+  return (document: Document) => readCells(document, strings, dateStyles, epoch);
+}
+
+/** The file is parsed on the user's device. No request contains workbook data. */
+export function readTemplate(data: Uint8Array): Template {
+  const parts = unpackWorkbook(data);
+  const workbook = xmlPart(parts, "xl/workbook.xml"), relations = xmlPart(parts, "xl/_rels/workbook.xml.rels");
+  const targets = new Map(descendants(relations, "Relationship", P).map(r => [r.getAttribute("Id"), targetPath("xl/workbook.xml", r.getAttribute("Target") || "")]));
+  const sheets = new Map(descendants(workbook, "sheet").map(s => [normalize(s.getAttribute("name") || ""), targets.get(s.getAttributeNS(R, "id"))]));
+  const sheetPath = sheets.get("khgdcn"), refPath = sheets.get("kodcxoa");
+  if (!sheetPath || !refPath) throw new Error("Mẫu phải có hai sheet KHGDCN và Ko dc xoa.");
+  const sheet = xmlPart(parts, sheetPath), reference = xmlPart(parts, refPath);
+  const read = workbookCellReader(parts);
+  const values = read(sheet), raw = read(reference);
   const expanded = fillMerged(reference, raw);
   for (const [index, label] of ["Bài số", "Tên bài", "Mục tiêu của bài", "Hướng dẫn", "Điểm cần đạt", "Tiêu chí cần đạt"].entries()) {
     if (normalize(text(values.get(`${String.fromCharCode(65 + index)}8`))) !== normalize(label)) throw new Error("KHGDCN không có đúng cột A:F tại hàng 8 của mẫu.");
@@ -279,6 +290,48 @@ export function readTemplate(data: Uint8Array): Template {
     defaults: { teacher: text(values.get("C7")), manager: text(values.get("F7")) } };
 }
 
+/** Import populated plan sheets using the reference template already open. */
+export function importPlans(data: Uint8Array, template: Template): ChildDraft[] {
+  const parts = unpackWorkbook(data);
+  const workbook = xmlPart(parts, "xl/workbook.xml");
+  const relations = xmlPart(parts, "xl/_rels/workbook.xml.rels");
+  const targets = new Map(descendants(relations, "Relationship", P).map(relation => [
+    relation.getAttribute("Id"), targetPath("xl/workbook.xml", relation.getAttribute("Target") || ""),
+  ]));
+  const read = workbookCellReader(parts);
+  const children: ChildDraft[] = [];
+  for (const sheet of descendants(workbook, "sheet")) {
+    const path = targets.get(sheet.getAttributeNS(R, "id"));
+    if (!path) throw new Error("Không tìm thấy nội dung sheet trong Excel.");
+    const document = xmlPart(parts, path), values = read(document);
+    const headers = ["Bài số", "Tên bài", "Mục tiêu của bài", "Hướng dẫn", "Điểm cần đạt", "Tiêu chí cần đạt"];
+    if (!headers.every((header, index) => normalize(text(values.get(`${String.fromCharCode(65 + index)}8`))) === normalize(header))) continue;
+    const expanded = fillMerged(document, values);
+    const name = text(values.get("C6")).trim() || sheet.getAttribute("name") || "Học sinh";
+    const lessons: DraftLesson[] = [], used = new Set<string>();
+    const last = Math.max(8, ...Array.from(values.keys(), coord => address(coord).row));
+    for (let row = 9; row <= last; row++) {
+      const code = text(values.get(`A${row}`)).trim();
+      if (!code) continue;
+      const lesson = template.lessons.get(normalize(code));
+      if (!lesson) throw new Error(`${name}, hàng ${row}: bài ${code} không có trong mẫu đang mở.`);
+      if (used.has(normalize(code))) throw new Error(`${name}: bài ${code} bị lặp trong Excel.`);
+      used.add(normalize(code));
+      const get = (column: string) => text(expanded.get(`${column}${row}`));
+      const score = get("E");
+      lessons.push({ id: crypto.randomUUID(), code: lesson.code, scoreId: "", origin: "excel", notes: get("G"),
+        manual: { name: get("B"), objective: get("C"), instruction: get("D"), criteria: get("F"), score } });
+    }
+    if (lessons.length > template.slots.length) throw new Error(`${name}: vượt quá ${template.slots.length} bài của mẫu đang mở.`);
+    const period = text(values.get("G6")).replace(/^Tháng\s*\/\s*Tuần\s*/i, "").trim();
+    children.push({ id: crypto.randomUUID(), name, age: text(values.get("F6")), teacher: text(values.get("C7")),
+      manager: text(values.get("F7")), period, lessons });
+    if (children.length > 100) throw new Error("Chỉ nhập tối đa 100 học sinh mỗi lần.");
+  }
+  if (!children.length) throw new Error("Không tìm thấy sheet kế hoạch có đúng cột A:F ở hàng 8. Hãy chọn file kế hoạch theo mẫu hoặc file đã xuất từ ứng dụng.");
+  return children;
+}
+
 export function validatePlans(template: Template, children: ChildDraft[]): PlannedChild[] {
   if (!children.length || children.length > 100) throw new Error("Một workbook cần từ 1 đến 100 học sinh.");
   return children.map((child, index) => {
@@ -295,11 +348,12 @@ export function validatePlans(template: Template, children: ChildDraft[]): Plann
       if (used.has(key)) throw new Error(`${name}: bài ${lesson.code} đã được chọn.`);
       used.add(key);
       const score = lesson.scores.find(s => s.id === row.scoreId) ?? null;
-      if (lesson.scores.length ? !score : !row.manual.score.trim()) throw new Error(`${name}, bài ${rowIndex + 1}: chưa ${lesson.scores.length ? "chọn" : "nhập"} điểm cần đạt hợp lệ.`);
+      const manualScore = row.origin === "excel" || !lesson.scores.length;
+      if (manualScore ? !row.manual.score.trim() : !score) throw new Error(`${name}, bài ${rowIndex + 1}: chưa ${manualScore ? "nhập" : "chọn"} điểm cần đạt hợp lệ.`);
       for (const value of [row.notes, ...Object.values(row.manual)]) {
         if (value.length > 32767 || /[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value)) throw new Error(`${name}, bài ${rowIndex + 1}: nội dung quá dài hoặc chứa ký tự không hợp lệ.`);
       }
-      return { lesson, fields: resolveLessonFields(lesson, score, row.manual), notes: row.notes };
+      return { lesson, fields: row.origin === "excel" ? { ...row.manual, score: row.manual.score.trim() } : resolveLessonFields(lesson, score, row.manual), notes: row.notes };
     });
     return { ...child, name, lessons };
   });
