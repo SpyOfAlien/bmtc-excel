@@ -1,6 +1,6 @@
+import { bundledTemplate } from "../src/lib/bundled-template";
+import { templateFixture } from "./template-fixture";
 import { emptyManualFields } from "../src/lib/lesson-fields";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { exportWorkbook, importPlans, normalize, readTemplate, sheetNames, validatePlans } from "../src/lib/workbook";
@@ -9,9 +9,8 @@ import { nextFilename, validPeriod } from "../src/lib/files";
 import { moveLesson } from "../src/lib/lesson-order";
 
 const S = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-const sourcePath = resolve(process.cwd(), "../../ref/KEHOACHMOI.xlsx");
-let source: Uint8Array, template: Template;
-beforeAll(() => { source = new Uint8Array(readFileSync(sourcePath)); template = readTemplate(source); });
+let source: Uint8Array, sourceSnapshot: Uint8Array, template: Template;
+beforeAll(() => { source = templateFixture(bundledTemplate()); sourceSnapshot = source.slice(); template = readTemplate(source); });
 
 function child(name = "Bé thử", codes = ["A5"]): ChildDraft {
   return { id: name, name, age: "5 tuổi", teacher: "Giáo viên thử", manager: "QLCM thử", period: "Tháng 10 / Tuần 2",
@@ -194,7 +193,7 @@ describe("values-only multi-child export", () => {
     expect(files["xl/sharedStrings.xml"]).toBeUndefined();
     expect(files["xl/calcChain.xml"]).toBeUndefined();
     expect(strFromU8(files["xl/worksheets/sheet1.xml"] || new Uint8Array())).not.toContain("BÉ HƯNG");
-    expect(readFileSync(sourcePath).equals(Buffer.from(source))).toBe(true);
+    expect(source).toEqual(sourceSnapshot);
   });
   it("skips rows covered by the merged score cell", async () => {
     const codes = Array.from(template.lessons.values()).slice(0, 20).map(l => l.code);

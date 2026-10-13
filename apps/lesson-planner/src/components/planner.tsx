@@ -14,7 +14,6 @@ import {
   importPlans,
   MAX_UPLOAD,
   normalize,
-  readTemplate,
   sheetNames,
   validatePlans,
 } from "@/lib/workbook";
@@ -33,6 +32,7 @@ import {
   saveInDirectory,
   validPeriod,
 } from "@/lib/files";
+import { bundledTemplate, templateName } from "@/lib/bundled-template";
 import { moveLesson } from "@/lib/lesson-order";
 import { applyLessonSelection } from "@/lib/lesson-selection";
 import { LessonCodeCell } from "@/components/lesson-code-cell";
@@ -143,120 +143,19 @@ interface LoadedTemplate {
 
 export default function Planner() {
   const [loaded, setLoaded] = useState<LoadedTemplate | null>(null);
-  const [busy, setBusy] = useState(false),
-    [status, setStatus] = useState("");
-  const [dragging, setDragging] = useState(false);
-  const input = useRef<HTMLInputElement>(null),
-    dragDepth = useRef(0);
-
-  async function load(file: File) {
-    if (busy) return;
-    setBusy(true);
-    setStatus("Đang đọc tệp…");
-    try {
-      if (!/\.xlsx$/i.test(file.name)) throw new Error("Chỉ nhận tệp .xlsx.");
-      if (file.size > MAX_UPLOAD)
-        throw new Error("Tệp .xlsx không được lớn hơn 30 MB.");
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const template = readTemplate(bytes);
-      const date = new Date();
-      setLoaded({
-        template,
-        filename: file.name,
-        directory: null,
-        month: date.getMonth() + 1,
-        year: date.getFullYear(),
-      });
-      setStatus("");
-    } catch (error) {
-      setStatus(message(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-  if (loaded)
-    return (
-      <Workspace
-        loaded={loaded}
-        restart={() => {
-          setLoaded(null);
-          setStatus("");
-        }}
-      />
-    );
-  return (
-    <main
-      className="grid min-h-dvh place-items-center p-6"
-      onDragEnter={(event) => {
-        event.preventDefault();
-        if (event.dataTransfer.types.includes("Files") && !busy) {
-          dragDepth.current++;
-          setDragging(true);
-        }
-      }}
-      onDragOver={(event) => {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = busy ? "none" : "copy";
-      }}
-      onDragLeave={(event) => {
-        event.preventDefault();
-        dragDepth.current = Math.max(0, dragDepth.current - 1);
-        if (!dragDepth.current) setDragging(false);
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        dragDepth.current = 0;
-        setDragging(false);
-        if (busy) return;
-        const files = Array.from(event.dataTransfer.files);
-        const file = files[0];
-        if (files.length !== 1 || !file) {
-          setStatus("Hãy kéo một tệp .xlsx vào đây.");
-          return;
-        }
-        void load(file);
-      }}
-    >
-      <div
-        className={`flex w-full max-w-sm flex-col items-center gap-4 rounded-xl border-2 border-dashed p-10 text-center transition-colors ${dragging ? "border-primary bg-primary/10" : "border-border bg-card"}`}
-        aria-busy={busy}
-      >
-        <Input
-          ref={input}
-          type="file"
-          accept=".xlsx"
-          hidden
-          disabled={busy}
-          aria-label="Chọn tệp .xlsx"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) void load(file);
-            event.target.value = "";
-          }}
-        />
-        <Button
-          size="lg"
-          disabled={busy}
-          onClick={() => input.current?.click()}
-        >
-          {busy ? "Đang nhập…" : "Nhập tệp .xlsx"}
-        </Button>
-        <p className="text-xs text-muted-foreground">
-          {dragging
-            ? "Thả tệp .xlsx để nhập"
-            : "hoặc kéo và thả tệp .xlsx vào đây"}
-        </p>
-        {status && (
-          <p
-            className={`text-sm ${busy ? "text-muted-foreground" : "text-destructive"}`}
-            role="status"
-          >
-            {status}
-          </p>
-        )}
-      </div>
-    </main>
-  );
+  const [session, setSession] = useState(0);
+  useEffect(() => {
+    const date = new Date();
+    setLoaded({
+      template: bundledTemplate(),
+      filename: templateName,
+      directory: null,
+      month: date.getMonth() + 1,
+      year: date.getFullYear(),
+    });
+  }, []);
+  if (!loaded) return <main className="grid min-h-dvh place-items-center" role="status">Đang tải bài học…</main>;
+  return <Workspace key={session} loaded={loaded} restart={() => setSession(value => value + 1)} />;
 }
 
 function freshChild(
@@ -789,7 +688,7 @@ function Workspace({
               className="text-xs text-primary"
               onClick={() => setWarnings(true)}
             >
-              Lưu ý từ mẫu
+              Lưu ý xuất Excel
               {template.warnings.length ? ` (${template.warnings.length})` : ""}
             </Button>
             <Button
@@ -798,7 +697,7 @@ function Workspace({
             >
               {importing ? "Đang nhập…" : "Nhập kế hoạch Excel"}
             </Button>
-            <Button onClick={() => setConfirmation("restart")}>Đổi mẫu</Button>
+            <Button onClick={() => setConfirmation("restart")}>Kế hoạch mới</Button>
           </div>
         </div>
       </Header>
@@ -1067,7 +966,7 @@ function Workspace({
         </Card>
       </main>
       {warnings && (
-        <Modal title="Lưu ý từ mẫu" close={() => setWarnings(false)}>
+        <Modal title="Lưu ý xuất Excel" close={() => setWarnings(false)}>
           <ul>
             {template.warnings.map((w) => (
               <li key={w}>{w}</li>
