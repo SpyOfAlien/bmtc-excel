@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Kế hoạch cá nhân · BMTC</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/vendor/ag-grid-community.min.js" defer></script>
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar"><div class="brand"><span class="brand-mark">HN</span><div>Hương Nắng<small>Kế hoạch giáo dục cá nhân</small></div></div><span class="local-badge">Chỉ trên máy này</span><button id="export" class="primary" disabled>Xuất Excel</button></header>
+  <section id="welcome" class="welcome">
+    <div class="eyebrow">CÔNG CỤ DÀNH CHO GIÁO VIÊN</div><h1>Một kế hoạch riêng<br>cho từng học sinh.</h1>
+    <p>Chọn mẫu Excel để bắt đầu. Nhập bài số và điểm cần đạt, nội dung còn lại lấy từ bảng tham khảo của bạn.</p>
+    <div class="setup-card"><h2>Thiết lập kế hoạch</h2><div class="two-fields"><label>Tháng<input id="setupMonth" type="number" min="1" max="12"></label><label>Năm<input id="setupYear" type="number" min="1900" max="9999"></label></div>
+    <button id="chooseFolder" class="primary wide">Chọn thư mục chứa mẫu Excel</button><label class="file-button" for="templateFile">Hoặc chọn trực tiếp tệp .xlsx<input id="templateFile" type="file" accept=".xlsx" hidden></label>
+    <p class="fine">Chọn thư mục giúp lưu file xuất cạnh mẫu và tự thêm _v2 khi trùng tên. Chọn tệp trực tiếp vẫn dùng được.</p><div id="setupStatus" class="status" role="status"></div>
+    <label id="folderTemplateLabel" hidden>Mẫu trong thư mục<select id="folderTemplate"></select></label><button id="loadFolderTemplate" hidden class="secondary wide">Dùng mẫu này</button></div>
+    <p class="privacy">Không tải dữ liệu lên mạng. Không lưu bản nháp. Đóng hoặc tải lại trang sẽ xóa kế hoạch đang nhập. Mẫu gốc không bị thay đổi.</p>
+  </section>
+  <main id="workspace" hidden>
+    <aside class="children-panel"><div class="eyebrow">HỌC SINH</div><h2 id="childCount">1 kế hoạch</h2><nav id="childList" aria-label="Danh sách học sinh"></nav><button id="addChild" class="secondary wide">+ Thêm học sinh</button><div class="session-note">Mỗi học sinh là một sheet trong cùng workbook.</div><button id="changeTemplate" class="text-button">Đổi mẫu / bắt đầu lại</button></aside>
+    <section class="plan-panel">
+      <div class="section-heading"><div><div class="eyebrow">KẾ HOẠCH THÁNG <span id="periodHeading"></span></div><h1 id="childHeading">Học sinh mới</h1></div><button id="removeChild" class="text-button danger">Xóa học sinh</button></div>
+      <div class="template-line"><span id="templateName"></span><button id="showWarnings" class="text-button">Lưu ý từ mẫu</button></div>
+      <div class="student-fields"><label class="name-field">Họ tên học sinh *<input id="name" autocomplete="off" placeholder="Nhập họ tên" maxlength="200"></label><label>Tuổi<input id="age" autocomplete="off" placeholder="Ví dụ: 5 tuổi" maxlength="200"></label><label>Giáo viên<input id="teacher" autocomplete="off" maxlength="200"></label><label>QLCM<input id="manager" autocomplete="off" maxlength="200"></label><label class="period-field">Tháng / tuần trong sheet<input id="period" placeholder="Ví dụ: Tháng 10 / Tuần 2" autocomplete="off" maxlength="200"></label></div>
+      <div class="lesson-toolbar"><div><h2>Bài học <span id="lessonCount" class="count">0</span></h2><p>Chọn bài số và điểm. Các cột nội dung chỉ đọc.</p></div><button id="addLesson" class="primary">+ Thêm bài</button></div>
+      <div id="lessonGrid" class="lesson-grid" aria-label="Bảng bài học"></div>
+      <div class="plan-footer"><span>Ghi chú và cột phụ để trống khi xuất.</span><span id="capacity"></span></div>
+    </section>
+    <aside class="reference-panel"><div class="reference-heading"><div class="eyebrow">THAM KHẢO GIÁO VIÊN</div><h2>Ko dc xoa <span class="readonly">Chỉ đọc</span></h2><p>Nội dung gốc từ mẫu, bao gồm các bài chưa có thang điểm.</p></div><label class="search-label"><span>Tìm trong tham khảo</span><input id="referenceSearch" type="search" placeholder="Bài số, tên bài, nội dung…"></label><div id="referenceGrid" class="reference-grid" aria-label="Bảng tham khảo chỉ đọc"></div><div id="referenceDetail" class="reference-detail"><p>Chọn một hàng để xem đầy đủ nội dung.</p></div></aside>
+  </main>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <dialog id="lessonDialog"><div class="dialog-heading"><div><div class="eyebrow">BẢNG THAM KHẢO</div><h2>Chọn bài số</h2></div><button id="closeLessonDialog" class="icon-button" aria-label="Đóng">×</button></div><label>Tìm bài<input id="lessonSearch" type="search" placeholder="Nhập mã hoặc tên bài…" autocomplete="off"></label><div id="lessonOptions" class="lesson-options"></div><p class="fine">Bài đã chọn cho học sinh này không thể chọn lại. Bài không có thang điểm chỉ dùng để tham khảo.</p></dialog>
+  <dialog id="warningsDialog"><div class="dialog-heading"><h2>Lưu ý từ mẫu</h2><button id="closeWarnings" class="icon-button" aria-label="Đóng">×</button></div><ul id="warningsList"></ul><p class="fine">Ứng dụng giữ nguyên chiều cao hàng của mẫu. Nội dung dài có thể bị cắt khi in Excel, giống bố cục mẫu gốc.</p></dialog>
+  <dialog id="saveDialog"><div class="dialog-heading"><div><div class="eyebrow">MỘT WORKBOOK · NHIỀU HỌC SINH</div><h2>Xuất kế hoạch</h2></div><button id="closeSave" class="icon-button" aria-label="Đóng">×</button></div><p id="exportSummary"></p><div class="two-fields"><label>Tháng<input id="exportMonth" type="number" min="1" max="12"></label><label>Năm<input id="exportYear" type="number" min="1900" max="9999"></label></div><p class="file-preview" id="filenamePreview"></p><label>Thư mục lưu <output id="saveLocation">Chưa chọn</output></label><button id="chooseSaveFolder" class="secondary wide">Chọn nơi lưu</button><p class="fine" id="saveHelp">File trùng tên tự thêm _v2, _v3… Không ghi đè mẫu hoặc kế hoạch đã xuất.</p><div id="saveStatus" role="status" class="status"></div><button id="confirmExport" class="primary wide">Lưu workbook</button><button id="downloadExport" class="text-button wide">Tải xuống qua trình duyệt</button></dialog>
+</body></html>

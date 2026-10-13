@@ -9,4 +9,6 @@ BMTC serves children needing special education support in Vietnam. Schools are t
 - [Documentation and versioning](docs/README.md): current versions, Git baselines, and the change workflow.
 - [Change log](docs/CHANGELOG.md) and [architecture decisions](docs/adr/README.md).
 
-The repository currently contains specifications. Technical proposals and unresolved product policies are identified explicitly; application implementation has not started.
+The repository also contains a [Next.js lesson planner](apps/lesson-planner/README.md), deployable to Cloudflare. It creates per-child Excel plans from an existing template, with workbook processing in the browser. Run it from `apps/lesson-planner` with `npm ci` and `npm run dev`.
+
+The specifications describe the wider platform. Technical proposals and unresolved product policies are identified explicitly.
