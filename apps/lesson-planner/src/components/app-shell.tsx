@@ -41,6 +41,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   useEffect(() => { let cancelled = false; void currentUser().then(user => { if (!cancelled) setProfileName(fullName(user)); }).catch(() => {}); return () => { cancelled = true; }; }, []);
   const path = usePathname();
   const pathname = path === "/" ? path : `${path.replace(/\/+$/, "")}/`;
+  const currentItem = items.find(item => item.href === pathname || (item.href !== "/" && pathname.startsWith(item.href)));
   const router = useRouter();
   const dirty = useRef(false);
   const [pending, setPending] = useState<string | null>(null);
@@ -62,6 +63,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <NavigationContext.Provider value={{ navigate, guard }}>
       <div className="app-frame md:flex">
         <aside className={`app-sidebar ${expanded ? "is-expanded" : "is-collapsed"}`}>
+          <div className="sidebar-toggle"><Button variant="ghost" size={expanded ? "default" : "icon"} aria-label={expanded ? "Thu gọn sidebar" : "Mở rộng sidebar"} aria-expanded={expanded} aria-controls="main-navigation" title={expanded ? "Thu gọn" : "Mở rộng"} onClick={() => setExpanded(value => !value)}>{expanded ? <PanelLeftClose aria-hidden="true" /> : <PanelLeftOpen aria-hidden="true" />}{expanded && <span>Thu gọn</span>}</Button></div>
           <div className="app-logo"><span className="app-logo-mark" aria-hidden="true" /><span className={expanded ? "" : "sr-only"}>Hương Nắng</span></div>
           <p className={expanded ? "sidebar-label" : "sr-only"}>KHÔNG GIAN LÀM VIỆC</p>
           <nav
@@ -75,7 +77,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 href={item.href}
                 aria-label={item.label}
                 title={!expanded ? item.label : undefined}
-                aria-current={pathname === item.href ? "page" : undefined}
+                aria-current={currentItem?.href === item.href ? "page" : undefined}
                 className="sidebar-link"
                 onClick={(event) => {
                   event.preventDefault();
@@ -87,10 +89,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             ))}
           </nav>
-          <div className="sidebar-toggle"><Button variant="ghost" size={expanded ? "default" : "icon"} aria-label={expanded ? "Thu gọn sidebar" : "Mở rộng sidebar"} aria-expanded={expanded} aria-controls="main-navigation" title={expanded ? "Thu gọn" : "Mở rộng"} onClick={() => setExpanded(value => !value)}>{expanded ? <PanelLeftClose aria-hidden="true" /> : <PanelLeftOpen aria-hidden="true" />}{expanded && <span>Thu gọn</span>}</Button></div>
         </aside>
         <div className="min-w-0 flex-1">
-          <header className="app-header"><div className="flex items-center gap-2 text-xs text-muted-foreground"><span>Kế hoạch giáo dục cá nhân</span><ChevronRight className="size-3" aria-hidden="true" /><span className="font-medium text-foreground">{items.find(item => item.href === pathname)?.label}</span></div>{profileName && <div className="flex items-center gap-2.5 text-xs"><span className="profile-avatar" aria-hidden="true">{profileName.split(" ").filter(Boolean).map(part => part[0]).slice(-2).join("")}</span><span>{profileName}</span></div>}</header>
+          <header className="app-header"><div className="flex items-center gap-2 text-xs text-muted-foreground"><span>Kế hoạch giáo dục cá nhân</span><ChevronRight className="size-3" aria-hidden="true" /><span className="font-medium text-foreground">{currentItem?.label}</span></div>{profileName && <div className="flex items-center gap-2.5 text-xs"><span className="profile-avatar" aria-hidden="true">{profileName.split(" ").filter(Boolean).map(part => part[0]).slice(-2).join("")}</span><span>{profileName}</span></div>}</header>
           {children}
         </div>
       </div>

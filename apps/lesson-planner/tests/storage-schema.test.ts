@@ -1,3 +1,4 @@
+import { copyPlan, nextPlanMonth } from "../src/lib/plan-utils";
 import { describe, expect, it } from "vitest";
 import data from "../src/data/lesson-template.json";
 import { bundledTemplate } from "../src/lib/bundled-template";
@@ -57,5 +58,37 @@ describe("storage data", () => {
     expect(base.lessons.has("m001")).toBe(false);
     const saved = { ...added, name: "Tên trong giáo án đã lưu" };
     expect(extendTemplate(extended, [saved]).lessons.get("m001")?.name).toBe(saved.name);
+  });
+});
+
+describe("plan copies and default month", () => {
+  it("defaults to next month, including December and the last day of a month", () => {
+    expect(nextPlanMonth(new Date(2026, 9, 31))).toEqual({ month: 11, year: 2026 });
+    expect(nextPlanMonth(new Date(2026, 11, 31))).toEqual({ month: 1, year: 2027 });
+  });
+  it("copies content independently while preserving lesson and student links", () => {
+    const original = testPlan();
+    original.expectedRevision = 8;
+    const child = original.children[0];
+    if (!child) throw new Error("Missing test child");
+    child.studentId = crypto.randomUUID();
+    const before = structuredClone(original);
+    const copy = copyPlan(original);
+    expect(planInputSchema.safeParse(copy).success).toBe(true);
+    expect(copy.id).not.toBe(original.id);
+    expect(copy.expectedRevision).toBe(0);
+    expect(copy.title).toBe(`${original.title} (bản sao)`);
+    expect(copy.children[0]?.id).not.toBe(child.id);
+    expect(copy.children[0]?.lessons[0]?.id).not.toBe(child.lessons[0]?.id);
+    expect(copy.children[0]?.studentId).toBe(child.studentId);
+    expect(copy.lessons).toEqual(original.lessons);
+    expect(copy.children[0]?.lessons[0]?.lessonId).toBe(child.lessons[0]?.lessonId);
+    expect(copy.children[0]?.lessons[0]?.scoreId).toBe(child.lessons[0]?.scoreId);
+    expect(copy.children[0]?.lessons[0]?.notes).toBe(child.lessons[0]?.notes);
+    const copiedChild = copy.children[0];
+    if (!copiedChild) throw new Error("Missing copied child");
+    copiedChild.name = "Đổi tên ở bản sao";
+    expect(original).toEqual(before);
+    expect(copyPlan({ ...original, title: "a".repeat(200) }).title.length).toBeLessThanOrEqual(200);
   });
 });

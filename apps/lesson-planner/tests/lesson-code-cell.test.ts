@@ -24,9 +24,9 @@ function renderPicker(otherRows: DraftLesson[] = [], availableLessons = lessons)
   cleanup = () => { act(() => root.unmount()); };
   return selected;
 }
-function checkbox(code: string) {
-  const element = document.querySelector(`button[role="checkbox"][aria-label="Chọn bài ${code}"]`);
-  if (!(element instanceof HTMLButtonElement)) throw new Error(`Missing checkbox ${code}`);
+function option(code: string) {
+  const element = document.querySelector(`input[type="checkbox"][aria-label="Chọn ${code} · Tên ${code}"]`);
+  if (!(element instanceof HTMLInputElement)) throw new Error(`Missing checkbox ${code}`);
   return element;
 }
 function button(text: string) {
@@ -46,7 +46,10 @@ describe("inline lesson control", () => {
   it("opens beside the cell and applies several selected lessons in click order", () => {
     const committed = renderPicker();
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    act(() => checkbox("A5").click()); act(() => checkbox("A1").click());
+    expect(option("A5").checked).toBe(false);
+    act(() => option("A5").click());
+    expect(option("A5").checked).toBe(true);
+    act(() => option("A1").click());
     act(() => button("Áp dụng 2 bài").click());
     expect(committed[0]?.map(row => row.code)).toEqual(["A5", "A1"]);
     expect(committed[0]?.every(row => !row.scoreId && !row.notes)).toBe(true);
@@ -54,11 +57,11 @@ describe("inline lesson control", () => {
   });
   it("keeps selections while filtering, rejects duplicates, and allows unscored lessons", () => {
     const committed = renderPicker([{ id: "other", lessonId: null, code: "B1", scoreId: "", notes: "", manual: emptyManualFields() }]);
-    expect(checkbox("B1").disabled).toBe(true); expect(checkbox("C1").disabled).toBe(false);
-    act(() => checkbox("A5").click());
+    expect(option("B1").disabled).toBe(true); expect(option("C1").disabled).toBe(false);
+    act(() => option("A5").click());
     search("A1");
-    expect(document.querySelector('button[aria-label="Chọn bài A5"]')).toBeNull();
-    act(() => checkbox("A1").click());
+    expect(document.querySelector('input[aria-label="Chọn A5 · Tên A5"]')).toBeNull();
+    act(() => option("A1").click());
     act(() => button("Áp dụng 2 bài").click());
     expect(committed[0]?.map(row => row.code)).toEqual(["A5", "A1"]);
   });
@@ -68,19 +71,19 @@ describe("inline lesson control", () => {
       return [lesson.code.toLowerCase(), lesson] as const;
     }));
     const committed = renderPicker([], catalog);
-    expect(document.querySelectorAll('button[role="checkbox"]')).toHaveLength(150);
-    act(() => checkbox("D150").click());
+    expect(document.querySelectorAll('input[type="checkbox"]')).toHaveLength(150);
+    act(() => option("D150").click());
     act(() => button("Áp dụng 1 bài").click());
     expect(committed[0]?.[0]?.code).toBe("D150");
   });
   it("does not add rows when the selection is cancelled", () => {
     const committed = renderPicker();
-    act(() => checkbox("A1").click()); act(() => button("Hủy").click());
+    act(() => option("A1").click()); act(() => button("Hủy").click());
     expect(committed).toHaveLength(0);
   });
   it("adds a lesson without predefined score options", () => {
     const committed = renderPicker();
-    act(() => checkbox("C1").click()); act(() => button("Áp dụng 1 bài").click());
+    act(() => option("C1").click()); act(() => button("Áp dụng 1 bài").click());
     expect(committed[0]?.[0]?.code).toBe("C1");
     expect(committed[0]?.[0]?.manual.score).toBe("");
   });

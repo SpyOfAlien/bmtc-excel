@@ -157,20 +157,11 @@
   .plan-footer {
     @apply mt-2 flex flex-wrap justify-between gap-2 text-[11px] text-muted-foreground;
   }
-  .row-order {
-    @apply flex h-full items-center gap-2 text-xs text-muted-foreground;
-  }
-  .order-buttons {
-    @apply flex flex-col gap-1;
-  }
-  .order-buttons button {
-    @apply size-6 p-0;
-  }
   .score-select {
-    @apply my-2 h-8 w-full px-2 text-xs;
+    @apply my-2 h-7 w-full px-2 text-xs;
   }
   .delete-row {
-    @apply size-7 p-0 text-lg text-destructive;
+    @apply size-7 p-0 text-destructive;
   }
   .lesson-notes {
     @apply my-2 h-[72px] min-h-0 resize-none p-2 text-xs;
@@ -207,11 +198,26 @@
   .manual-lesson-field,
   .lesson-code-cell,
   .delete-row,
-  .row-order,
   .lesson-notes
 ) {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
+}
+/* Keep compact row controls centered across the full row height. */
+.ag-cell:has(.score-select, .manual-score, .delete-row, .lesson-code-cell) {
+  display: flex;
+  align-items: center;
+}
+.ag-cell:has(.score-select, .manual-score, .delete-row, .lesson-code-cell) .ag-cell-wrapper {
+  height: 100%;
+  width: 100%;
+  align-items: center;
+}
+.ag-cell:has(.score-select, .manual-score, .delete-row, .lesson-code-cell) .ag-cell-value {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  width: 100%;
 }
 .ag-header-cell-text {
   font-size: 11px;
@@ -261,7 +267,7 @@
 .app-sidebar.is-expanded { width: 208px; }
 .app-sidebar.is-collapsed .app-logo { justify-content: center; padding-left: 0; padding-right: 0; }
 .app-sidebar.is-collapsed .sidebar-link { justify-content: center; padding: 12px; }
-.sidebar-toggle { margin-top: auto; padding: 16px; border-top: 1px solid var(--border); }
+.sidebar-toggle { padding: 12px 16px 0; }
 @media (max-width: 767px) {
   .app-sidebar.is-collapsed, .app-sidebar.is-expanded { width: 100%; }
   .app-sidebar { flex-direction: row; align-items: center; flex-wrap: wrap; }
@@ -272,3 +278,22 @@
   .app-sidebar.is-expanded nav { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) { .app-sidebar { transition: none; } }
+
+.lesson-grid [data-slot="input"],
+.lesson-grid [data-slot="textarea"] {
+  background-color: var(--card);
+  border-color: #d8d2e5;
+}
+.lesson-grid [data-slot="input"]:focus-visible,
+.lesson-grid [data-slot="textarea"]:focus-visible {
+  border-color: var(--primary);
+}
+
+.lesson-grid .ag-cell:has(.delete-row) {
+  padding-left: 0;
+  padding-right: 0;
+  justify-content: center;
+}
+.lesson-grid .ag-cell:has(.delete-row) .ag-cell-value {
+  justify-content: center;
+}

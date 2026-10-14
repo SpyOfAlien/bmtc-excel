@@ -17,6 +17,7 @@ export function ExportPlanDialog({
   close,
   saved,
   record,
+  prepare,
 }: {
   loaded: { template: Template; filename: string; directory: FileSystemDirectoryHandle | null };
   childrenPlans: ChildDraft[];
@@ -25,6 +26,7 @@ export function ExportPlanDialog({
   close: () => void;
   saved: (message: string, month: number, year: number) => void;
   record?: (eventId: string) => Promise<void>;
+  prepare?: (period: { month: number; year: number }) => Promise<ChildDraft[]>;
 }) {
   const [month, setMonth] = useState(initialMonth),
     [year, setYear] = useState(initialYear);
@@ -90,13 +92,17 @@ export function ExportPlanDialog({
             "granted")
       )
         throw new Error("Hãy chọn thư mục và cho phép lưu file.");
-      const bytes = await exportWorkbook(loaded.template, childrenPlans);
+      setDownload(null);
+      setStatus(prepare ? "Đang lưu giáo án…" : "Đang tạo workbook trên thiết bị…");
+      const currentPlans = prepare ? await prepare({ month, year }) : childrenPlans;
+      setStatus("Đang tạo workbook trên thiết bị…");
+      const bytes = await exportWorkbook(loaded.template, currentPlans);
       if (useDownload) {
         setDownload({
           url: workbookDownloadUrl(bytes),
           name: nextFilename(filename, [], loaded.filename),
         });
-        setStatus("Workbook đã sẵn sàng. Nhấn Tải file bên dưới.");
+        setStatus(`${prepare ? "Đã lưu giáo án. " : ""}Workbook đã sẵn sàng. Nhấn Tải file bên dưới.`);
       } else if (directory) {
         const name = await saveInDirectory({
           directory,
@@ -126,7 +132,7 @@ export function ExportPlanDialog({
         {childrenPlans.length} học sinh ·{" "}
         {childrenPlans.reduce((n, c) => n + c.lessons.length, 0)} bài học.
       </p>
-      <p className="fine">{record ? "Lượt xuất được tính khi tải file hoặc lưu vào thư mục." : "Giáo án chưa lưu. Lưu giáo án trước để theo dõi số lượt xuất."}</p>
+      <p className="fine">{prepare ? "Giáo án hiện tại được lưu trước khi xuất Excel. Lượt xuất được tính khi tải file hoặc lưu vào thư mục." : record ? "Lượt xuất được tính khi tải file hoặc lưu vào thư mục." : "Giáo án chưa lưu. Lưu giáo án trước để theo dõi số lượt xuất."}</p>
       <p className="fine">
         Các sheet: {names.join(", ")}. Chỉ xuất nội dung, không có công thức hay
         sheet tham khảo.

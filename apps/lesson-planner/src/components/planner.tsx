@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useAppNavigation } from "./app-shell";
+import { nextPlanMonth } from "@/lib/plan-utils";
 import { teacherName } from "@/lib/user-profile";
-import { Save, Download } from "lucide-react";
+import { Save, Download, Trash2 } from "lucide-react";
 import {
   AllCommunityModule,
   ModuleRegistry,
@@ -54,10 +55,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
+import { SearchPicker } from "./search-picker";
+import { MonthPicker } from "./month-picker";
 import { Modal } from "./planner-modal";
 import { ExportPlanDialog } from "./export-plan-dialog";
 import { StudentAutocomplete } from "./student-autocomplete";
@@ -74,7 +73,7 @@ const theme = themeQuartz.withParams({
   borderColor: "#eeedf2",
   accentColor: "#6938ef",
   wrapperBorderRadius: 7,
-  rowHoverColor: "#f5f1ff",
+  rowHoverColor: "#faf9fd",
 });
 const message = (error: unknown) =>
   error instanceof Error ? error.message : "Không thể xử lý workbook.";
@@ -114,8 +113,8 @@ interface LoadedTemplate {
 }
 
 export default function Planner() {
-  const params = useSearchParams();
-  const planId = params.get("id");
+  const pathname = usePathname();
+  const planId = pathname?.match(/^\/plans\/([^/]+)\/?$/)?.[1] ?? null;
   const [retry, setRetry] = useState(0);
   const [state, setState] = useState<
     | { kind: "loading" }
@@ -131,15 +130,15 @@ export default function Planner() {
     ])
       .then(([user, saved]) => {
         if (cancelled) return;
-        const date = new Date();
+        const nextMonth = nextPlanMonth();
         setState({
           kind: "ready",
           loaded: {
             template: bundledTemplate(),
             filename: templateName,
             directory: null,
-            month: date.getMonth() + 1,
-            year: date.getFullYear(),
+            month: nextMonth.month,
+            year: nextMonth.year,
             teacher: teacherName(user),
           },
           saved,
@@ -495,53 +494,14 @@ function Workspace({
     }
     return [
       {
-        headerName: "Thứ tự",
-        width: 116,
-        suppressSizeToFit: true,
-        pinned: "left",
-        rowDrag: (params) => params.data?.kind === "lesson",
-        valueGetter: (params) => lessonRow(params.data)?.index,
-        cellRenderer: (params: ICellRendererParams<TableRow>) => {
-          const data = lessonRow(params.data);
-          return (
-            data && (
-              <div className="row-order">
-                <span>{data.index}</span>
-                <div className="order-buttons">
-                  <Button
-                    variant="outline"
-                    size="icon-xs"
-                    aria-label={`Chuyển bài ${data.index} lên`}
-                    title="Chuyển lên"
-                    disabled={data.index === 1}
-                    onClick={() => reorderRow(data.id, data.index - 2)}
-                  >
-                    ↑
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon-xs"
-                    aria-label={`Chuyển bài ${data.index} xuống`}
-                    title="Chuyển xuống"
-                    disabled={data.index === active?.lessons.length}
-                    onClick={() => reorderRow(data.id, data.index)}
-                  >
-                    ↓
-                  </Button>
-                </div>
-              </div>
-            )
-          );
-        },
-      },
-      {
         headerName: "Bài số *",
-        width: 180,
-        minWidth: 180,
-        maxWidth: 180,
+        width: 164,
+        minWidth: 164,
+        maxWidth: 164,
         resizable: false,
         suppressSizeToFit: true,
         pinned: "left",
+        rowDrag: (params) => params.data?.kind === "lesson",
         valueGetter: (params) => {
           const data = lessonRow(params.data);
           return data ? `${data.index}:${data.code}` : "";
@@ -565,9 +525,9 @@ function Workspace({
       },
       {
         headerName: "Điểm cần đạt *",
-        width: 130,
-        minWidth: 130,
-        maxWidth: 130,
+        width: 120,
+        minWidth: 120,
+        maxWidth: 120,
         resizable: false,
         suppressSizeToFit: true,
         pinned: "left",
@@ -584,7 +544,7 @@ function Workspace({
           )
             return (
               <Input
-                className="manual-score my-2 h-8 px-2 text-xs"
+                className="manual-score my-2 h-7 px-2 text-xs"
                 aria-label={`Điểm cần đạt bài ${data.index}`}
                 placeholder="Nhập điểm…"
                 maxLength={32767}
@@ -596,24 +556,21 @@ function Workspace({
               />
             );
           return (
-            <NativeSelect
-              className="score-select my-2 h-8 px-2 pr-6 text-xs"
-              aria-label={`Điểm cần đạt bài ${data.index}`}
+            <SearchPicker
+              className="score-select h-7 px-2 pr-7 text-xs"
+              label={`Điểm cần đạt bài ${data.index}`}
+              placeholder="Điểm"
               disabled={!data.lesson}
-              value={data.scoreId}
-              onChange={(event) => {
-                updateRow(data.id, { scoreId: event.target.value });
-
-              }}
-            >
-              <NativeSelectOption value="">Chọn điểm…</NativeSelectOption>
-              {data.lesson?.scores.map((score) => (
-                <NativeSelectOption key={score.id} value={score.id}>
-                  {score.label}
-                  {score.dateLike ? " · ngày gốc" : ""}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
+              options={[
+                { value: "", label: "Điểm" },
+                ...(data.lesson?.scores.map(score => ({
+                  value: score.id,
+                  label: `${score.label}${score.dateLike ? " · ngày gốc" : ""}`,
+                  description: score.criteria,
+                })) ?? []),
+              ]}
+              selection={{ kind: "single", value: data.scoreId, select: scoreId => updateRow(data.id, { scoreId }) }}
+            />
           );
         },
       },
@@ -651,8 +608,10 @@ function Workspace({
       {
         headerName: "",
         width: 42,
+        minWidth: 42,
+        maxWidth: 42,
+        resizable: false,
         suppressSizeToFit: true,
-        pinned: "right",
         valueGetter: (params) => lessonRow(params.data)?.index,
         cellRenderer: (params: ICellRendererParams<TableRow>) => {
           const data = lessonRow(params.data);
@@ -660,11 +619,11 @@ function Workspace({
             data && (
               <Button
                 variant="ghost"
-                className="delete-row size-7 p-0 text-lg text-destructive"
+                className="delete-row size-7 items-center justify-center p-0 text-destructive"
                 aria-label={`Xóa bài ${data.index}`}
                 onClick={() => removeRow(data.id)}
               >
-                ×
+                <Trash2 className="size-4" aria-hidden="true" />
               </Button>
             )
           );
@@ -718,8 +677,10 @@ function Workspace({
       if (importInput.current) importInput.current.value = "";
     }
   }
-  async function persistPlan(title: string) {
-    const current = childrenRef.current;
+  async function persistPlan(title: string, savedPeriod = period) {
+    const current = savedPeriod.month === period.month && savedPeriod.year === period.year
+      ? childrenRef.current
+      : childrenRef.current.map(child => ({ ...child, period: `Tháng ${savedPeriod.month}/${savedPeriod.year}` }));
     const chosen = new Set(
       current.flatMap((child) =>
         child.lessons.flatMap((row) => (row.lessonId ? [row.lessonId] : [])),
@@ -732,8 +693,8 @@ function Workspace({
       schemaVersion: 1,
       id: planIdentity.id,
       title,
-      month: period.month,
-      year: period.year,
+      month: savedPeriod.month,
+      year: savedPeriod.year,
       children: current,
       lessons: snapshots,
       expectedRevision: planIdentity.revision,
@@ -743,9 +704,12 @@ function Workspace({
       title: result.plan.title,
       revision: result.revision,
     });
-    setBaseline({ children: current, period });
+    setChildren(current);
+    setPeriod(savedPeriod);
+    setBaseline({ children: current, period: savedPeriod });
     setPlanSaveDialog(false);
     setToast("Đã lưu giáo án. Bạn có thể mở lại từ Trang chủ.");
+    return current;
   }
   function openExport() {
     try {
@@ -859,7 +823,7 @@ function Workspace({
               />
             </Label>
             <Label className="grid gap-2 text-xs text-muted-foreground">
-              QLCM
+              Quản lý chuyên môn
               <Input
                 value={active.manager}
                 maxLength={200}
@@ -867,13 +831,11 @@ function Workspace({
               />
             </Label>
             <Label className="period-field grid gap-2 text-xs text-muted-foreground">
-              Tháng / tuần trong sheet
-              <Input
-                value={active.period}
-                maxLength={200}
-                onChange={(e) => updateChild({ period: e.target.value })}
-                placeholder="Ví dụ: Tháng 10 / Tuần 2"
-              />
+              Tháng
+              <MonthPicker month={period.month} year={period.year} change={({ month, year }) => {
+                setPeriod({ month, year });
+                setChildren(current => current.map(child => ({ ...child, period: `Tháng ${month}/${year}` })));
+              }} />
             </Label>
           </div>
         </Card>
@@ -900,10 +862,6 @@ function Workspace({
               theme={theme}
               rowData={rowData}
               columnDefs={columns}
-              onFirstDataRendered={(event) => event.api.sizeColumnsToFit()}
-              onGridSizeChanged={(event) => {
-                if (event.clientWidth > 0) event.api.sizeColumnsToFit();
-              }}
               rowHeight={96}
               headerHeight={42}
               suppressCellFocus
@@ -951,7 +909,7 @@ function Workspace({
             planIdentity.title || `Giáo án tháng ${period.month}/${period.year}`
           }
           close={() => setPlanSaveDialog(false)}
-          save={persistPlan}
+          save={async title => { await persistPlan(title); }}
         />
       )}
       {confirmation && (
@@ -1010,7 +968,8 @@ function Workspace({
       )}
       {saveOpen && (
         <ExportPlanDialog
-          record={planIdentity.revision > 0 ? async eventId => { await recordExport(planIdentity.id, eventId); } : undefined}
+          prepare={savedPeriod => persistPlan(planIdentity.title || `Giáo án tháng ${savedPeriod.month}/${savedPeriod.year}`, savedPeriod)}
+          record={async eventId => { await recordExport(planIdentity.id, eventId); }}
           loaded={{ ...loaded, template }}
           childrenPlans={children}
           month={period.month}

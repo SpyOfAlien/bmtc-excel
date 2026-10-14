@@ -1,19 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { currentUser, listPlans, loadPlan, extendTemplate, recordExport } from "../lib/storage-client";
+import { currentUser, listPlans, loadPlan, extendTemplate, recordExport, savePlan } from "../lib/storage-client";
 import type {
   PlanSummary,
   SavedPlan,
   UserProfile,
 } from "../lib/storage-schema";
-import { FileText, Search, Plus, ArrowUpRight, Download } from "lucide-react";
+import { FileText, Search, Plus, ArrowUpRight, Download, Copy } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { ExportPlanDialog } from "./export-plan-dialog";
 import { bundledTemplate, templateName } from "@/lib/bundled-template";
 import { validatePlans } from "@/lib/workbook";
+import { copyPlan } from "@/lib/plan-utils";
 import { Card } from "./ui/card";
 
 const message = (error: unknown) =>
@@ -29,10 +30,8 @@ type HomeState =
 
 export function PlanHome({
   create,
-  opened,
 }: {
   create: () => void;
-  opened: (saved: SavedPlan) => void;
 }) {
   const [state, setState] = useState<HomeState>({ kind: "loading" });
   const [exporting, setExporting] = useState<SavedPlan | null>(null);
@@ -74,12 +73,28 @@ export function PlanHome({
       .toLocaleLowerCase("vi")
       .includes(key),
   );
-  async function open(id: string) {
+  async function duplicatePlan(id: string) {
     if (opening) return;
     setOpening(id);
     setOpenError("");
+    setNotice("");
     try {
-      opened(await loadPlan(id));
+      const original = await loadPlan(id);
+      const saved = await savePlan(copyPlan(original.plan));
+      setState(current => current.kind === "ready" ? {
+        ...current,
+        plans: [{
+          id: saved.plan.id,
+          title: saved.plan.title,
+          month: saved.plan.month,
+          year: saved.plan.year,
+          updatedAt: saved.updatedAt,
+          revision: saved.revision,
+          exportCount: 0,
+        }, ...current.plans],
+      } : current);
+      setQuery("");
+      setNotice(`Đã sao chép thành "${saved.plan.title}". Mở bản sao để chỉnh sửa.`);
     } catch (error) {
       setOpenError(message(error));
     } finally {
@@ -194,7 +209,7 @@ export function PlanHome({
                 <tbody>
                   {filtered.map((plan) => (
                     <tr key={plan.id} className="border-t hover:bg-muted/20">
-                      <td className="min-w-60 px-5 py-4 font-medium"><div className="flex items-center gap-3"><span className="table-icon"><FileText className="size-4" aria-hidden="true" /></span>{plan.title}</div></td>
+                      <td className="min-w-60 px-5 py-4 font-medium"><div className="flex items-center gap-3"><span className="table-icon"><FileText className="size-4" aria-hidden="true" /></span><a href={`/plans/${encodeURIComponent(plan.id)}/`} className="text-primary underline-offset-4 hover:underline focus-visible:underline">{plan.title}</a></div></td>
                       <td className="whitespace-nowrap px-5 py-4 text-muted-foreground">
                         {plan.month}/{plan.year}
                       </td>
@@ -203,15 +218,10 @@ export function PlanHome({
                       </td>
                       <td className="px-5 py-4"><span className="rounded-md bg-accent px-2 py-1 text-xs text-primary">{plan.exportCount}</span></td>
                       <td className="px-5 py-4 text-right"><div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={opening !== null}
-                          aria-label={`Mở kế hoạch ${plan.title}`}
-                          onClick={() => void open(plan.id)}
-                        >
-                          {opening === plan.id ? "Đang mở…" : "Mở kế hoạch"}<ArrowUpRight aria-hidden="true" />
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={`/plans/${encodeURIComponent(plan.id)}/`} aria-label={`Mở kế hoạch ${plan.title}`}>Mở kế hoạch<ArrowUpRight aria-hidden="true" /></a>
                         </Button>
+                        <Button variant="outline" size="sm" disabled={opening !== null} aria-label={`Sao chép kế hoạch ${plan.title}`} onClick={() => void duplicatePlan(plan.id)}><Copy aria-hidden="true" />Sao chép</Button>
                         <Button variant="outline" size="sm" disabled={opening !== null} aria-label={`Xuất Excel ${plan.title}`} onClick={() => void exportPlan(plan.id)}><Download aria-hidden="true" />Xuất Excel</Button></div>
                       </td>
                     </tr>
@@ -222,7 +232,19 @@ export function PlanHome({
           )}
         </Card>
       </main>
-      {exporting && <ExportPlanDialog loaded={{ template: extendTemplate(bundledTemplate(), exporting.plan.lessons), filename: templateName, directory: null }} childrenPlans={exporting.plan.children} month={exporting.plan.month} year={exporting.plan.year} close={() => setExporting(null)} record={async eventId => {
+      {exporting && <ExportPlanDialog loaded={{ template: extendTemplate(bundledTemplate(), exporting.plan.lessons), filename: templateName, directory: null }} childrenPlans={exporting.plan.children} month={exporting.plan.month} year={exporting.plan.year} close={() => setExporting(null)} prepare={async ({ month, year }) => {
+        if (month === exporting.plan.month && year === exporting.plan.year) return exporting.plan.children;
+        const saved = await savePlan({
+          ...exporting.plan,
+          month,
+          year,
+          children: exporting.plan.children.map(child => ({ ...child, period: `Tháng ${month}/${year}` })),
+          expectedRevision: exporting.revision,
+        });
+        setExporting(saved);
+        setState(current => current.kind === "ready" ? { ...current, plans: current.plans.map(plan => plan.id === saved.plan.id ? { ...plan, month, year, updatedAt: saved.updatedAt, revision: saved.revision } : plan) } : current);
+        return saved.plan.children;
+      }} record={async eventId => {
         const result = await recordExport(exporting.plan.id, eventId);
         setState(current => current.kind === "ready" ? { ...current, plans: current.plans.map(plan => plan.id === exporting.plan.id ? { ...plan, exportCount: result.exportCount } : plan) } : current);
       }} saved={message => { setNotice(message); setExporting(null); }} />}

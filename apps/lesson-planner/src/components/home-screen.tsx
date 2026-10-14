@@ -7,9 +7,6 @@ export function HomeScreen() {
   return (
     <PlanHome
       create={() => navigate("/plans/")}
-      opened={(saved) =>
-        navigate(`/plans/?id=${encodeURIComponent(saved.plan.id)}`)
-      }
     />
   );
 }
