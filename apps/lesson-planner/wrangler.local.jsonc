@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bmtc-lesson-planner-local",
+  "compatibility_date": "2026-10-11",
+  "assets": {
+    "directory": "./out",
+    "not_found_handling": "404-page",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/api/*"
+    ]
+  },
+  "main": "worker/index.ts",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bmtc-lessons-local",
+      "database_id": "bcc69dd5-992d-4a39-9187-022b0761c41a",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "DEV_ORIGINS": "http://127.0.0.1:3000,http://localhost:3000"
+  }
+}

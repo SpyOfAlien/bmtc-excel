@@ -3,7 +3,7 @@ import { emptyManualFields, resolveLessonFields } from "../src/lib/lesson-fields
 import type { Lesson, Score } from "../src/lib/workbook";
 
 const score: Score = { id: "2", label: "2", source: "A1.2", value: 2, criteria: "", row: 3, dateLike: false };
-const lesson: Lesson = { code: "A1", name: "Tên từ tham khảo", objective: "", instruction: "HD từ tham khảo", criteria: "Tiêu chí của điểm khác", row: 3, scores: [score] };
+const lesson: Lesson = { id: crypto.randomUUID(), code: "A1", name: "Tên từ tham khảo", objective: "", instruction: "HD từ tham khảo", criteria: "Tiêu chí của điểm khác", row: 3, scores: [score] };
 const manual = { name: "Không thay tên", objective: "Mục tiêu thủ công", instruction: "Không thay HD", criteria: "Tiêu chí thủ công", score: "Không thay điểm" };
 
 describe("reference and manual lesson fields", () => {

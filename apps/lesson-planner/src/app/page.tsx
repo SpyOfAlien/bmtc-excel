@@ -1,5 +1,5 @@
-import Planner from "@/components/planner";
+import { HomeScreen } from "@/components/home-screen";
 
 export default function Home() {
-  return <Planner />;
+  return <HomeScreen />;
 }

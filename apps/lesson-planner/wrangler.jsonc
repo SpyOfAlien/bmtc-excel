@@ -4,6 +4,19 @@
   "compatibility_date": "2026-10-11",
   "assets": {
     "directory": "./out",
-    "not_found_handling": "404-page"
-  }
+    "not_found_handling": "404-page",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/api/*"
+    ]
+  },
+  "main": "worker/index.ts",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "khgdcn",
+      "database_id": "b37591bb-338b-445d-a444-7d2cc2b4fe1a",
+      "migrations_dir": "migrations"
+    }
+  ]
 }

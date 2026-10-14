@@ -14,25 +14,25 @@
   --color-secondary-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-  --color-accent: #e5eee9;
+  --color-accent: #f0eaff;
   --color-accent-foreground: var(--primary);
   --color-destructive: #b34136;
   --color-border: var(--border);
   --color-input: var(--border);
-  --color-ring: #73a18a;
+  --color-ring: #a68aef;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 :root {
-  --background: #f6f8f6;
-  --foreground: #253b33;
+  --background: #f7f7fc;
+  --foreground: #242239;
   --card: #ffffff;
-  --primary: #205a46;
-  --muted: #edf2ee;
-  --muted-foreground: #687a70;
-  --border: #dce5df;
+  --primary: #6938ef;
+  --muted: #f4f4f7;
+  --muted-foreground: #858391;
+  --border: #eeedf2;
   --radius: 0.625rem;
 }
 @layer base {
@@ -41,10 +41,10 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   }
   h1 {
-    @apply text-2xl font-semibold tracking-tight;
+    @apply text-xl font-semibold tracking-tight;
   }
   h2 {
     @apply text-base font-semibold;
@@ -62,7 +62,7 @@
 }
 @layer components {
   .topbar {
-    @apply flex min-h-20 flex-wrap items-center gap-4 border-b bg-card px-4 py-4 sm:px-8;
+    @apply flex min-h-16 flex-wrap items-center gap-4 border-b bg-card px-4 py-4 sm:px-6;
   }
   .brand {
     @apply mr-auto flex items-center gap-3 text-base font-semibold;
@@ -107,7 +107,7 @@
     @apply font-normal text-muted-foreground;
   }
   .workspace-meta {
-    @apply flex items-center gap-2 text-xs text-muted-foreground;
+    @apply flex flex-wrap items-center gap-2 text-xs text-muted-foreground;
   }
   .workspace-meta > span {
     @apply hidden max-w-56 truncate lg:block;
@@ -122,7 +122,7 @@
     @apply flex h-12 shrink-0 items-center gap-0 rounded-b-none border-b-2 border-transparent text-muted-foreground;
   }
   .student-tab.active {
-    @apply border-primary bg-accent text-primary;
+    @apply border-primary bg-accent font-medium text-primary;
   }
   .student-tab small {
     @apply rounded bg-card px-1.5 text-[10px];
@@ -156,48 +156,6 @@
   }
   .plan-footer {
     @apply mt-2 flex flex-wrap justify-between gap-2 text-[11px] text-muted-foreground;
-  }
-  .reference-panel {
-    @apply gap-0 overflow-hidden py-0;
-  }
-  .reference-topbar {
-    @apply flex flex-wrap items-center justify-between gap-4 border-b bg-muted/50 p-4;
-  }
-  .reference-heading h2 {
-    @apply mb-1 flex flex-wrap items-center gap-3;
-  }
-  .reference-heading p {
-    @apply text-xs text-muted-foreground;
-  }
-  .search-label {
-    @apply w-full sm:w-80;
-  }
-  .search-label span {
-    @apply sr-only;
-  }
-  .reference-body {
-    @apply grid min-w-0 ;
-  }
-  .reference-body.has-detail {
-    @apply md:grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)];
-  }
-  .reference-grid {
-    @apply h-[clamp(420px,55vh,680px)] min-w-0 overflow-hidden;
-  }
-  .reference-detail {
-    @apply h-64 overflow-auto border-t p-5 text-xs md:border-t-0 md:border-l;
-  }
-  .reference-detail h3 {
-    @apply mt-4 mb-1 text-sm font-medium text-primary;
-  }
-  .reference-detail p {
-    @apply whitespace-pre-wrap break-words;
-  }
-  .ref-title {
-    @apply text-sm font-semibold;
-  }
-  .ref-row {
-    @apply mb-2 text-[10px] text-muted-foreground;
   }
   .row-order {
     @apply flex h-full items-center gap-2 text-xs text-muted-foreground;
@@ -262,13 +220,55 @@
 .ag-root-wrapper {
   border-color: var(--border) !important;
 }
-.reference-grid .ag-root-wrapper {
-  border: 0;
-  border-radius: 0;
-}
 .ag-drag-handle {
   cursor: grab;
 }
 .ag-drag-handle:active {
   cursor: grabbing;
 }
+
+/* Shared dashboard layout and compact controls. */
+@layer components {
+  .app-frame { @apply min-h-dvh w-full bg-background; }
+  .app-sidebar { @apply border-b bg-card md:sticky md:top-0 md:h-dvh md:w-52 md:shrink-0 md:border-r md:border-b-0; }
+  .app-logo { @apply flex items-center gap-2.5 px-5 py-6 text-lg font-semibold tracking-tight; }
+  .app-logo-mark { @apply relative h-6 w-6 rounded-l-full rounded-r-md bg-primary; }
+  .app-logo-mark::after { content: ""; @apply absolute top-0 -right-1 h-6 w-1 rounded-sm bg-primary; }
+  .sidebar-label { @apply mb-2 px-6 text-[10px] font-medium tracking-wider text-muted-foreground; }
+  .sidebar-link { @apply flex items-center gap-3 rounded-lg px-3 py-3 text-[13px] text-muted-foreground transition-colors hover:bg-muted; }
+  .sidebar-link[aria-current="page"] { @apply bg-primary text-white shadow-sm shadow-primary/10; }
+  .app-header { @apply flex h-16 items-center justify-between gap-4 border-b bg-card px-4 sm:px-6; }
+  .profile-avatar { @apply grid size-8 place-items-center rounded-full bg-accent text-xs font-semibold text-primary; }
+  .dashboard-page { @apply mx-auto max-w-[1600px] p-4 sm:p-6; }
+  .page-toolbar { @apply mb-4 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-white bg-card p-5; }
+  .dashboard-table { @apply w-full text-left text-[13px]; }
+  .dashboard-table thead { @apply bg-card text-[11px] font-normal text-muted-foreground; }
+  .dashboard-table th { @apply font-normal; }
+  .dashboard-table tbody tr { @apply border-t border-border transition-colors hover:bg-accent/30; }
+  .table-icon { @apply grid size-9 shrink-0 place-items-center rounded-full bg-accent text-primary; }
+  .search-field { @apply relative; }
+  .search-field > svg { @apply pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground; }
+  .search-field input { @apply h-9 border-transparent bg-muted pl-9 shadow-none; }
+}
+[data-slot="card"] { box-shadow: none; border-color: transparent; border-radius: 8px; }
+[data-slot="button"] { font-size: 12px; }
+[data-slot="button"]:not(:focus-visible) { box-shadow: none; }
+[data-slot="input"]:not(:focus-visible), [data-slot="textarea"]:not(:focus-visible), [data-slot="native-select"]:not(:focus-visible) { box-shadow: none; }
+.student-fields [data-slot="input"] { background: var(--muted); border-color: transparent; }
+
+.app-sidebar { display: flex; flex-direction: column; transition: width 180ms ease; }
+.app-sidebar.is-collapsed { width: 72px; }
+.app-sidebar.is-expanded { width: 208px; }
+.app-sidebar.is-collapsed .app-logo { justify-content: center; padding-left: 0; padding-right: 0; }
+.app-sidebar.is-collapsed .sidebar-link { justify-content: center; padding: 12px; }
+.sidebar-toggle { margin-top: auto; padding: 16px; border-top: 1px solid var(--border); }
+@media (max-width: 767px) {
+  .app-sidebar.is-collapsed, .app-sidebar.is-expanded { width: 100%; }
+  .app-sidebar { flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .app-sidebar .app-logo { padding: 16px; }
+  .app-sidebar nav { flex: 1; padding: 8px; }
+  .app-sidebar .sidebar-toggle { margin: 0; padding: 8px; border: 0; }
+  .app-sidebar .sidebar-label { display: none; }
+  .app-sidebar.is-expanded nav { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) { .app-sidebar { transition: none; } }

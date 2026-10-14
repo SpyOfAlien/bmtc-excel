@@ -8,3 +8,6 @@ next-env.d.ts
 !.env.example
 coverage/
 test-results/
+
+__pycache__/
+*.pyc

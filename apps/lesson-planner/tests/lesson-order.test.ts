@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { moveLesson } from "../src/lib/lesson-order";
 
 const rows = [
-  { id: "a", code: "A1", scoreId: "one", notes: "Ghi chú A1", manual: emptyManualFields() },
-  { id: "b", code: "A5", scoreId: "two", notes: "", manual: emptyManualFields() },
-  { id: "c", code: "A6", scoreId: "three", notes: "", manual: emptyManualFields() },
+  { id: "a", lessonId: null, code: "A1", scoreId: "one", notes: "Ghi chú A1", manual: emptyManualFields() },
+  { id: "b", lessonId: null, code: "A5", scoreId: "two", notes: "", manual: emptyManualFields() },
+  { id: "c", lessonId: null, code: "A6", scoreId: "three", notes: "", manual: emptyManualFields() },
 ];
 
 describe("lesson order", () => {

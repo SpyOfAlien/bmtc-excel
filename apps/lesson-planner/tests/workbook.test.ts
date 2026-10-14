@@ -17,8 +17,8 @@ function child(name = "Bé thử", codes = ["A5"]): ChildDraft {
     lessons: codes.map((code, i) => {
       const lesson = template.lessons.get(normalize(code));
       const score = lesson?.scores.at(-1);
-      if (!score) throw new Error(`Missing test fixture ${code}`);
-      return { id: String(i), code, scoreId: score.id, notes: "", manual: emptyManualFields() };
+      if (!lesson || !score) throw new Error(`Missing test fixture ${code}`);
+      return { id: crypto.randomUUID(), lessonId: lesson.id, code, scoreId: score.id, notes: "", manual: emptyManualFields() };
     }) };
 }
 function xml(bytes: Uint8Array | undefined) {
@@ -77,7 +77,7 @@ describe("real workbook parsing", () => {
     expect(() => validatePlans(template, [child(" ")])).toThrow("họ tên");
     expect(() => validatePlans(template, [child("An", [])])).toThrow("cần từ 1");
     const wrong = child();
-    wrong.lessons = [{ id: "1", code: "A5", scoreId: "3", notes: "", manual: emptyManualFields() }];
+    wrong.lessons = [{ id: "1", lessonId: null, code: "A5", scoreId: "3", notes: "", manual: emptyManualFields() }];
     expect(() => validatePlans(template, [wrong])).toThrow("điểm cần đạt");
   });
   it("rejects invalid archives and mismatched templates", () => {
@@ -95,7 +95,7 @@ describe("values-only multi-child export", () => {
     const incomplete = { ...template, lessons: new Map(template.lessons) };
     incomplete.lessons.set("a5", { ...original, name: "", objective: "", instruction: "", criteria: "", scores: [] });
     const plan = child("Thủ công");
-    plan.lessons = [{ id: "manual", code: "A5", scoreId: "", notes: "Ghi chú", manual: {
+    plan.lessons = [{ id: "manual", lessonId: original.id, code: "A5", scoreId: "", notes: "Ghi chú", manual: {
       name: "=Tên & <thủ công>", objective: "Mục tiêu mới", instruction: "Hướng dẫn mới\nDòng 2", criteria: "Tiêu chí mới", score: "2 / 4",
     } }];
     const regular = child("Tham khảo", ["A1"]);
@@ -115,7 +115,7 @@ describe("values-only multi-child export", () => {
     const first = child("An", ["A1", "A5"]);
     const second = child("Bình", ["A1", "A5"]);
     first.lessons = first.lessons.map(row => ({ ...row, notes: row.code === "A5" ? "=Ghi chú & <thử>\nDòng thứ hai" : "" }));
-    first.lessons = moveLesson(first.lessons, "1", 0);
+    first.lessons = moveLesson(first.lessons, required(first.lessons[1]).id, 0);
     const files = unzipSync(await exportWorkbook(template, [first, second]));
     const firstSheet = xml(files["xl/worksheets/sheet1.xml"]);
     const secondSheet = xml(files["xl/worksheets/sheet2.xml"]);

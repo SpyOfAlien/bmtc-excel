@@ -10,7 +10,7 @@ let cleanup = () => {};
 afterEach(() => { cleanup(); document.body.replaceChildren(); });
 
 const makeLesson = (code: string, scored = true): Lesson => ({
-  code, name: `Tên ${code}`, objective: "Mục tiêu", instruction: "Hướng dẫn", criteria: "Tiêu chí", row: 3,
+  id: crypto.randomUUID(), code, name: `Tên ${code}`, objective: "Mục tiêu", instruction: "Hướng dẫn", criteria: "Tiêu chí", row: 3,
   scores: scored ? [{ id: code, label: "2", source: `${code}.2`, value: 2, criteria: "Tiêu chí", row: 3, dateLike: false }] : [],
 });
 const lessons = new Map([makeLesson("A1"), makeLesson("A5"), makeLesson("B1"), makeLesson("C1", false)].map(lesson => [lesson.code.toLowerCase(), lesson]));
@@ -18,7 +18,7 @@ const lessons = new Map([makeLesson("A1"), makeLesson("A5"), makeLesson("B1"), m
 function renderPicker(otherRows: DraftLesson[] = [], availableLessons = lessons) {
   const container = document.createElement("div"); document.body.append(container);
   const root = createRoot(container), selected: DraftLesson[][] = [];
-  const row = { id: "blank", code: "", scoreId: "", notes: "", manual: emptyManualFields(), index: 1 };
+  const row = { id: "blank", lessonId: null, code: "", scoreId: "", notes: "", manual: emptyManualFields(), index: 1 };
   act(() => root.render(createElement(LessonCodeCell, { row, lessons: availableLessons, getRows: () => [row, ...otherRows], limit: 10, startOpen: true,
     close: () => {}, commit: (_id, rows) => { selected.push(rows); } })));
   cleanup = () => { act(() => root.unmount()); };
@@ -53,7 +53,7 @@ describe("inline lesson control", () => {
     expect(document.querySelector('[data-slot="popover-content"]')).toBeNull();
   });
   it("keeps selections while filtering, rejects duplicates, and allows unscored lessons", () => {
-    const committed = renderPicker([{ id: "other", code: "B1", scoreId: "", notes: "", manual: emptyManualFields() }]);
+    const committed = renderPicker([{ id: "other", lessonId: null, code: "B1", scoreId: "", notes: "", manual: emptyManualFields() }]);
     expect(checkbox("B1").disabled).toBe(true); expect(checkbox("C1").disabled).toBe(false);
     act(() => checkbox("A5").click());
     search("A1");

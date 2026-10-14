@@ -1,6 +1,6 @@
 # Lesson planner
 
-Next.js App Router + React + TypeScript + Tailwind CSS v4 + shadcn/ui + AG Grid Community. Deploys to Cloudflare Workers as static assets. Workbook parsing and export run entirely in the browser; no Python service, API endpoint, database, or uploaded student data is required.
+Next.js App Router + React + TypeScript + Tailwind CSS v4 + shadcn/ui + AG Grid Community. Deploys to Cloudflare Workers as static assets. Excel import/export run in the browser. Custom lesson templates and saved lesson plans are persisted through a Cloudflare Worker with D1.
 
 The shared shadcn/ui components live in `src/components/ui`, with registry configuration in `components.json`. Tailwind theme tokens and layout styles live in `src/app/globals.css`. AG Grid remains responsible for the two spreadsheet-style tables. Buttons, cards, badges, labels, inputs, notes, native selects and dialogs use shadcn/ui.
 
@@ -10,6 +10,9 @@ Use Node.js 22.12+ or 24+.
 
 ```sh
 npm ci
+npm run db:local
+npm run dev:storage
+# In another terminal:
 npm run dev
 ```
 
@@ -35,7 +38,7 @@ npm run build
 npm run preview
 ```
 
-Only `out/` is deployed. The bundled JSON catalog and export layout are included in the application. Source Excel files in `ref/`, test data, and the former Python prototype are not included. If deployed on an ordinary `workers.dev` address, the application shell is public; workbook and child data remain in the user's browser. Put the hostname behind Cloudflare Access if your organization requires a restricted app URL.
+The Worker API and static assets in `out/` are deployed together. The bundled JSON catalog and export layout are included in the application. Source Excel files in `ref/`, test data, and the former Python prototype are not included. If deployed on an ordinary `workers.dev` address, the application shell is public; Excel files remain in the browser, while explicitly saved lesson plans and custom lessons are stored in D1. Put the hostname behind Cloudflare Access if your organization requires a restricted app URL.
 
 ## Teacher workflow
 
@@ -85,3 +88,52 @@ python3 scripts/generate-template.py /path/to/template.xlsx
 ```
 
 The source workbook is only needed for regeneration. Running, building, and testing the app use the committed JSON. Tests construct small Excel fixtures from it and verify parsing, editing, and export without local files in `ref/`.
+
+## Lesson templates and saved plans
+
+The default Home screen shows the current user and their saved plans, with search by title or month/year, create, and open actions. The workspace has a Home button and asks before discarding unsaved edits. Only saved plans appear on Home.
+
+- `+ Thêm bài mẫu` creates a reusable lesson with optional score choices and criteria. Codes cannot duplicate either the original JSON catalog or another saved lesson. New lessons appear in both the picker and reference table.
+- `Lưu giáo án` saves the entire workspace, including all students, row order, scores, notes, manually entered fields, and snapshots of selected reference content. Unfinished drafts can be saved. Saving an opened plan updates that plan; starting a new plan gives it a new UUID.
+- `Mở giáo án` lists and restores saved plans. The stored snapshots keep plan content intact even if the reference catalog later changes. A revision check rejects conflicting updates from another tab.
+- Every persistent ID uses the UUID format. Original catalog UUIDs are derived once with UUIDv5 and checked into JSON; new lessons, scores, students, draft rows and plans use UUIDv4. Regenerating the same source codes and score keys retains their IDs. Excel still displays and imports human-readable lesson codes.
+
+The `users` table stores UUID, first_name, last_name and timestamps. Migration 0002 seeds the fixed user and backfills existing lesson/plan owners. Migration 0003 replaces display_name with first_name/last_name and preserves UUIDs and timestamps. The default profile has first_name Hoà; new plans fill the teacher as Cô + first_name. `/api/user` returns the current profile.
+
+For this initial version, the Worker uses the fixed UUID in `worker/storage-api.ts` as the user identity. All users of this installation therefore share the same saved lesson library and plans. This is not authentication. A future login integration should replace the server-side identity resolution; the browser never supplies the owner ID.
+
+### D1 production setup
+
+The production binding `DB` in `wrangler.jsonc` points to `khgdcn` with ID `b37591bb-338b-445d-a444-7d2cc2b4fe1a`. The local database in `wrangler.local.jsonc` is separate.
+
+Apply the database migration once before deploying the storage features:
+
+```sh
+npx wrangler login
+npm run db:remote
+npm run deploy
+```
+
+Alternatively, execute `migrations/0001_lessons_and_plans.sql` followed by `migrations/0002_users.sql` and `migrations/0003_user_names.sql` in the Cloudflare D1 console. The migrations create users, lessons/plans tables and indexes without dropping existing tables. When deploying through the existing GitHub connection, keep the build command `npm run build`, deploy command `npx wrangler deploy`, and root directory `apps/lesson-planner`; the database migration is a separate one-time step. CLI migration access requires permission to edit the selected D1 database.
+
+To point at a different database:
+
+```sh
+node scripts/configure-d1.mjs database-name database-uuid
+```
+
+API paths under `/api/*` are routed to `worker/index.ts`; other requests serve the static assets in `out/`. `npm run dev:storage` starts the local Worker on port 8787. During Next development, `/api/*` is forwarded to that local Worker. The application can still use its original catalog and export Excel while storage is unavailable, and shows a clear error for failed storage requests. Requests and plan snapshots are limited to 1.8 MB to stay within D1's per-row limit.
+
+The API integration tests run against a real isolated local D1 database through Wrangler's platform proxy. They cover duplicate codes, validation, shared identity, saving/reopening drafts, stored snapshots, and revision conflicts.
+
+The sidebar links to three exported routes: `/` (Home), `/plans/` (editor), and `/library/` (lesson library). Saved plans open at `/plans/?id=UUID`, so the URL can be reloaded. The library supports catalog search, lesson details and adding reusable lessons. Sidebar navigation asks before discarding unsaved edits.
+
+## Students and export counts
+
+Migration `0004_students_and_exports.sql` creates `students`, `student_teachers` and `plan_exports`. Existing named students in saved plan snapshots are backfilled with their original UUIDs. The join table allows a student to belong to multiple teachers. Student listing is scoped to the fixed current user. The API supports linking a student to another existing user with `POST /api/students/:id/teachers`, only when the current user already owns a link to that student. Login/user switching and a teacher assignment screen are not implemented yet.
+
+The student picker loads this teacher's list, supports search and multi-select, and lets the teacher create a profile. Creating a profile saves it immediately; choosing it creates a plan tab with a separate tab UUID and `studentId`. Plan metadata remains a snapshot and does not edit the shared student profile. An unnamed empty initial tab is replaced by the selected students. Removing a plan tab does not remove the student profile or other teachers' links. Legacy and imported plan rows without `studentId` remain valid.
+
+Home can export a saved plan without opening the editor. The same export dialog is used by both routes. Every download request or successful directory save for a saved plan records a UUID export event; retrying that event does not increment twice. Opening the dialog or generating a preview does not count. The browser cannot confirm that a user retained a downloaded file; counts represent download requests/directory saves. Unsaved plans can still export but have no stored count until saved. Export events do not change plan revision or updated time. Apply `npm run db:remote` before deploying this feature.
+
+The `/students/` route provides search, create and edit for shared student profiles. Edits use updatedAt for optimistic concurrency and do not rewrite saved plan snapshots. The sidebar collapses to icons by default and can expand. The planner name field has an accessible autocomplete with keyboard selection, fills name/age/studentId, and excludes students already in other tabs.

@@ -17,7 +17,7 @@ describe("repository template", () => {
     const template = bundledTemplate(), lesson = template.lessons.get("a5"), score = lesson?.scores[0];
     if (!lesson || !score) throw new Error("Missing catalog fixture");
     const bytes = await exportWorkbook(template, [{ id: "student", name: "Bé An", age: "5", teacher: "Cô Hoà", manager: "", period: "Tháng 10/2026", lessons: [{
-      id: "lesson", code: lesson.code, scoreId: score.id, notes: "Ghi chú", manual: { name: "", objective: "", instruction: "", criteria: "", score: "" },
+      id: "lesson", lessonId: lesson.id, code: lesson.code, scoreId: score.id, notes: "Ghi chú", manual: { name: "", objective: "", instruction: "", criteria: "", score: "" },
     }] }]);
     const restored = importPlans(bytes, template);
     expect(restored[0]?.name).toBe("Bé An");

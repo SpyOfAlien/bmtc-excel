@@ -1,4 +1,5 @@
 """Convert a maintained Excel template to repository JSON. Standard library only."""
+from catalog_ids import assign_ids
 import base64
 import datetime
 import json
@@ -165,6 +166,8 @@ for cell in plan.iter(f'{{{S}}}c'):
         cell.set('t', 'inlineStr')
         ET.SubElement(ET.SubElement(cell, f'{{{S}}}is'), f'{{{S}}}t').text = text(value)
 data = dict(version=1, name='Kế hoạch Hương Nắng', center=get_text(values, 'A1'), defaults=dict(teacher='Cô Hoà', manager=get_text(values, 'F7')), lessons=list(lessons.values()), reference=reference_rows, slots=slots, warnings=warnings, values=header_values, sheetPath=plan_path, sheetXml=ET.tostring(plan, encoding='unicode'), parts={path: parts[path].decode() for path in ['xl/styles.xml', 'xl/theme/theme1.xml', '[Content_Types].xml'] if path in parts}, assets=assets)
+index = assign_ids(data)
+Path('src/data/catalog-ids.json').write_text(json.dumps(index, ensure_ascii=False, indent=2) + '\n')
 output = Path('src/data/lesson-template.json')
 output.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
 print(json.dumps(dict(lessons=len(lessons), referenceRows=len(reference_rows), slots=len(slots), unscored=unscored, dateScores=dates, bytes=output.stat().st_size)))

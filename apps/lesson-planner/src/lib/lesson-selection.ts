@@ -19,7 +19,10 @@ export function applyLessonSelection({ rows, rowId, selected, limit }: {
   const originalSelected = accepted.some(row => normalize(row.code) === normalize(original.code));
   const replacements = accepted.map((row, index) => {
     if (normalize(row.code) === normalize(original.code)) return original;
-    if (!originalSelected && index === 0) return { ...original, code: row.code, scoreId: "", manual: emptyManualFields() };
+    if (!originalSelected && index === 0) {
+      const { origin, ...referenceRow } = original;
+      return { ...referenceRow, code: row.code, lessonId: row.lessonId, scoreId: "", manual: emptyManualFields() };
+    }
     return row;
   });
   return [...rows.slice(0, position), ...replacements, ...rows.slice(position + 1)];
