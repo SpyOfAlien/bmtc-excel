@@ -246,7 +246,14 @@
   .app-header { @apply flex h-16 items-center justify-between gap-4 border-b bg-card px-4 sm:px-6; }
   .profile-avatar { @apply grid size-8 place-items-center rounded-full bg-accent text-xs font-semibold text-primary; }
   .dashboard-page { @apply mx-auto max-w-[1600px] p-4 sm:p-6; }
-  .page-toolbar { @apply mb-4 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-white bg-card p-5; }
+  .page-toolbar { @apply mb-4 flex min-h-12 flex-wrap items-center justify-between gap-3 rounded-lg border border-white bg-card px-4 py-1.5; }
+  .page-toolbar > div { @apply flex min-w-0 items-center gap-4; }
+  .page-toolbar h1 { @apply shrink-0 text-base leading-6; }
+  .page-toolbar p { @apply m-0 hidden truncate text-xs md:block; }
+  .page-toolbar > [data-slot="button"] { @apply h-8; }
+  @media (min-width: 768px) {
+    .page-toolbar { height: 3rem; flex-wrap: nowrap; }
+  }
   .dashboard-table { @apply w-full text-left text-[13px]; }
   .dashboard-table thead { @apply bg-card text-[11px] font-normal text-muted-foreground; }
   .dashboard-table th { @apply font-normal; }
@@ -296,4 +303,33 @@
 }
 .lesson-grid .ag-cell:has(.delete-row) .ag-cell-value {
   justify-content: center;
+}
+
+.app-frame.has-contained-page {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.has-contained-page .app-sidebar,
+.has-contained-page .app-header {
+  flex-shrink: 0;
+}
+.has-contained-page .app-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.library-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+@media (min-width: 768px) {
+  .app-frame.has-contained-page { flex-direction: row; }
 }

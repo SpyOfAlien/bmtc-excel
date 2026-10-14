@@ -143,12 +143,41 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
     if (studentMatch && request.method === "PUT") {
       const id = z.string().uuid().parse(studentMatch[1]);
       const student = studentUpdateSchema.parse(await readBody(request));
-      if (id !== student.id) return json({ error: "ID học sinh không khớp." }, 400);
-      if (!await db.prepare("SELECT 1 FROM student_teachers WHERE student_id = ? AND user_id = ?").bind(id, FIXED_USER_ID).first()) return json({ error: "Không tìm thấy học sinh của giáo viên hiện tại." }, 404);
+      if (id !== student.id)
+        return json({ error: "ID học sinh không khớp." }, 400);
+      if (
+        !(await db
+          .prepare(
+            "SELECT 1 FROM student_teachers WHERE student_id = ? AND user_id = ?",
+          )
+          .bind(id, FIXED_USER_ID)
+          .first())
+      )
+        return json(
+          { error: "Không tìm thấy học sinh của giáo viên hiện tại." },
+          404,
+        );
       const now = new Date().toISOString();
-      const result = await db.prepare("UPDATE students SET name = ?, age = ?, updated_at = ? WHERE id = ? AND updated_at = ?").bind(student.name,student.age,now,id,student.expectedUpdatedAt).run();
-      if (result.meta.changes !== 1) return json({ error: "Hồ sơ đã được cập nhật ở nơi khác. Tải lại danh sách trước khi sửa." }, 409);
-      const row = await db.prepare("SELECT id,name,age,created_at AS createdAt,updated_at AS updatedAt FROM students WHERE id = ?").bind(id).first();
+      const result = await db
+        .prepare(
+          "UPDATE students SET name = ?, age = ?, updated_at = ? WHERE id = ? AND updated_at = ?",
+        )
+        .bind(student.name, student.age, now, id, student.expectedUpdatedAt)
+        .run();
+      if (result.meta.changes !== 1)
+        return json(
+          {
+            error:
+              "Hồ sơ đã được cập nhật ở nơi khác. Tải lại danh sách trước khi sửa.",
+          },
+          409,
+        );
+      const row = await db
+        .prepare(
+          "SELECT id,name,age,created_at AS createdAt,updated_at AS updatedAt FROM students WHERE id = ?",
+        )
+        .bind(id)
+        .first();
       return json(studentSchema.parse(row));
     }
     const teacherMatch = /^\/api\/students\/([^/]+)\/teachers$/.exec(path);

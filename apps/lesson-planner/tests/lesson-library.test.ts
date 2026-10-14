@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import { LessonLibrary } from "../src/components/lesson-library";
 import { bundledTemplate } from "../src/lib/bundled-template";
+import { lessonGroup } from "../src/lib/lesson-groups";
 
 Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", { configurable: true, value: true });
 let cleanup = () => {};
@@ -12,24 +13,47 @@ function button(label: string) {
   if (!(element instanceof HTMLButtonElement)) throw new Error(`Missing ${label}`);
   return element;
 }
-it("expands a group, selects its first lesson, and updates the detail panel when another lesson is clicked", async () => {
+async function renderLibrary() {
   vi.stubGlobal("fetch", vi.fn(async () => Response.json([])));
   const host = document.createElement("div"); document.body.append(host);
   const root = createRoot(host);
   cleanup = () => { act(() => root.unmount()); };
   await act(async () => root.render(createElement(LessonLibrary)));
-  expect(button("Nhóm A").getAttribute("aria-expanded")).toBe("true");
-  expect(button("Bài A1").getAttribute("aria-current")).toBe("true");
+}
+function visibleCodes() {
+  return Array.from(document.querySelectorAll("table tbody tr")).map(row => row.querySelector("td")?.textContent ?? "");
+}
+it("filters the list with multiple group checkboxes and supports selecting all or no groups", async () => {
+  await renderLibrary();
+  const catalog = [...bundledTemplate().lessons.values()];
+  expect(visibleCodes()).toHaveLength(catalog.length);
+  expect(button("Nhóm A").getAttribute("role")).toBe("checkbox");
+  act(() => button("Tất cả nhóm").click());
+  expect(visibleCodes()).toHaveLength(0);
+  act(() => button("Nhóm A").click());
+  expect(visibleCodes()).toHaveLength(catalog.filter(lesson => lessonGroup(lesson.code) === "A").length);
+  expect(visibleCodes()).toContain("A1");
+  expect(visibleCodes()).not.toContain("B1");
   act(() => button("Nhóm B").click());
-  expect(button("Nhóm B").getAttribute("aria-expanded")).toBe("true");
-  expect(button("Bài B1").getAttribute("aria-current")).toBe("true");
-  const detail = document.querySelector('section[aria-label="Chi tiết bài học"]');
-  expect(detail?.textContent).toContain(bundledTemplate().lessons.get("b1")?.name);
-  act(() => button("Bài B2").click());
-  expect(button("Bài B2").getAttribute("aria-current")).toBe("true");
-  expect(detail?.textContent).toContain(bundledTemplate().lessons.get("b2")?.name);
-  act(() => button("Nhóm B").click());
-  expect(button("Nhóm B").getAttribute("aria-expanded")).toBe("false");
-  expect(document.querySelector('button[aria-label="Bài B2"]')).toBeNull();
+  expect(visibleCodes()).toContain("A1");
+  expect(visibleCodes()).toContain("B1");
+  expect(visibleCodes()).not.toContain("C1");
+  expect(button("Tất cả nhóm").getAttribute("aria-checked")).toBe("mixed");
+  act(() => button("Tất cả nhóm").click());
+  expect(visibleCodes()).toHaveLength(catalog.length);
   expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+it("combines search with the selected groups and opens details for a list item", async () => {
+  await renderLibrary();
+  act(() => button("Tất cả nhóm").click());
+  act(() => button("Nhóm B").click());
+  const field = document.querySelector('input[type="search"]');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  if (!(field instanceof HTMLInputElement) || !setter) throw new Error("Missing search");
+  act(() => { setter.call(field, "B2"); field.dispatchEvent(new Event("input", { bubbles: true })); });
+  expect(visibleCodes()).toContain("B2");
+  expect(visibleCodes().every(code => lessonGroup(code) === "B")).toBe(true);
+  expect(button("Nhóm B").getAttribute("aria-checked")).toBe("true");
+  act(() => button("Chi tiết bài B2").click());
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(bundledTemplate().lessons.get("b2")?.name);
 });

@@ -6,10 +6,14 @@ import { extendTemplate, listLessons } from "@/lib/storage-client";
 import type { Lesson } from "@/lib/workbook";
 import { NewLessonDialog } from "./storage-dialogs";
 import { groupLessons, lessonGroup } from "@/lib/lesson-groups";
-import { Search, Plus, ChevronRight, BookOpen } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { Checkbox } from "./ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
+
+type GroupFilter = { kind: "all" } | { kind: "selected"; groups: Set<string> };
 
 
 export function LessonLibrary() {
@@ -20,7 +24,7 @@ export function LessonLibrary() {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(["A"]));
+  const [groupFilter, setGroupFilter] = useState<GroupFilter>({ kind: "all" });
   const refresh = useCallback(
     async (cancelled: () => boolean = () => false) => {
       setLoading(true);
@@ -55,30 +59,34 @@ export function LessonLibrary() {
     [base, custom],
   );
   const key = query.trim().toLocaleLowerCase("vi");
-  const lessons = catalog.filter((lesson) =>
+  const searched = catalog.filter((lesson) =>
     `${lesson.code} ${lesson.name} ${lesson.objective}`
       .toLocaleLowerCase("vi")
       .includes(key),
   );
   const customIds = new Set(custom.map((lesson) => lesson.id));
-  const groups = groupLessons(lessons);
-  const selected = lessons.find(lesson => lesson.id === selectedId) ?? groups[0]?.lessons[0] ?? null;
+  const groups = groupLessons(catalog);
+  const isGroupSelected = (group: string) => groupFilter.kind === "all" || groupFilter.groups.has(group);
+  const lessons = groupLessons(searched).flatMap(group => isGroupSelected(group.name) ? group.lessons : []);
+  const selected = catalog.find(lesson => lesson.id === selectedId) ?? null;
+  const selectedGroupCount = groups.filter(group => isGroupSelected(group.name)).length;
+  const allChecked = selectedGroupCount === groups.length;
+  function toggleGroup(group: string, checked: boolean) {
+    setGroupFilter(current => {
+      const next = current.kind === "all" ? new Set(groups.map(item => item.name)) : new Set(current.groups);
+      if (checked) next.add(group); else next.delete(group);
+      return { kind: "selected", groups: next };
+    });
+  }
   return (
-    <main className="dashboard-page">
-      <div className="page-toolbar">
-        <div>
-          <h1>Thư viện bài học</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Tra cứu bài mẫu và thêm bài để sử dụng trong kế hoạch.
-          </p>
-        </div>
-        <Button onClick={() => setAdding(true)}><Plus aria-hidden="true" /> Thêm bài mẫu</Button>
-      </div>
-      <div className="mb-1 flex flex-wrap items-center justify-between gap-4 rounded-t-lg bg-card p-5">
+    <main className="dashboard-page library-page">
+      <h1 className="sr-only">Thư viện bài học</h1>
+      <div className="table-toolbar mb-1 flex shrink-0 min-h-[60px] flex-wrap items-center justify-between gap-3 rounded-t-lg bg-card px-5 py-3 sm:h-[60px] sm:flex-nowrap">
         <p className="text-sm text-muted-foreground">
           {lessons.length} / {catalog.length} bài học
         </p>
-        <Label className="grid gap-2">
+        <div className="ml-auto flex min-w-0 items-center gap-3">
+        <Label className="grid min-w-0 gap-2">
           <span className="sr-only">Tìm bài học</span>
           <div className="search-field"><Search aria-hidden="true" /><Input
             type="search"
@@ -88,17 +96,18 @@ export function LessonLibrary() {
             onChange={event => {
               setQuery(event.target.value);
               setSelectedId(null);
-              setExpanded(event.target.value.trim() ? new Set(catalog.map(lesson => lessonGroup(lesson.code))) : new Set(["A"]));
             }}
           /></div>
         </Label>
+        <Button className="h-9 shrink-0" onClick={() => setAdding(true)}><Plus aria-hidden="true" />Thêm bài mẫu</Button>
+        </div>
       </div>
       {loading && (
         <p role="status" className="mb-4 text-sm">
           Đang tải bài tự thêm…
         </p>
       )}
-      {error && (
+      {error && error !== "Không lưu/đọc được dữ liệu." && (
         <div
           role="alert"
           className="mb-4 flex flex-wrap items-center gap-3 text-sm"
@@ -109,49 +118,45 @@ export function LessonLibrary() {
           </Button>
         </div>
       )}
-      <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <nav aria-label="Nhóm bài học" className="max-h-[70dvh] overflow-y-auto rounded-lg bg-card p-2">
-          {groups.map(group => {
-            const open = expanded.has(group.name);
-            return <div key={group.name}>
-              <button type="button" aria-label={`Nhóm ${group.name}`} aria-expanded={open} aria-controls={`lesson-group-${group.name}`} className="flex w-full items-center gap-2 rounded-md px-3 py-3 text-left text-sm font-medium hover:bg-muted" onClick={() => {
-                setExpanded(current => { const next = new Set(current); if (open) next.delete(group.name); else next.add(group.name); return next; });
-                if (!open) setSelectedId(group.lessons[0]?.id ?? null);
-              }}>
-                <ChevronRight className={`size-4 shrink-0 transition-transform ${open ? "rotate-90" : ""}`} aria-hidden="true" />
-                <span>Nhóm {group.name}</span><span className="ml-auto text-xs font-normal text-muted-foreground">{group.lessons.length}</span>
-              </button>
-              {open && <ul id={`lesson-group-${group.name}`} className="ml-5 space-y-1 border-l pl-2 pb-2">
-                {group.lessons.map(lesson => <li key={lesson.id}><button type="button" aria-label={`Bài ${lesson.code}`} aria-current={selected?.id === lesson.id ? "true" : undefined} className={`flex w-full items-start gap-2 rounded-md px-3 py-2.5 text-left text-xs transition-colors ${selected?.id === lesson.id ? "bg-accent font-medium text-primary" : "hover:bg-muted"}`} onClick={() => setSelectedId(lesson.id)}>
-                  <BookOpen className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" /><span><span className="block font-medium">{lesson.code}</span><span className="mt-1 block text-muted-foreground">{lesson.name || "Chưa có tên bài"}</span></span>
-                </button></li>)}
-              </ul>}
-            </div>;
-          })}
-          {!groups.length && <p className="p-4 text-sm text-muted-foreground">Không tìm thấy bài phù hợp.</p>}
-        </nav>
-        <section aria-label="Chi tiết bài học" className="min-w-0 rounded-lg bg-card p-5 sm:p-6">
-          {selected ? <>
-            <div className="mb-6 border-b pb-4">
-              <span className="rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-primary">{selected.code}</span>
-              <h2 className="mt-3 text-lg font-semibold">{selected.name || "Bài học"}</h2>
-              <p className="mt-2 text-xs text-muted-foreground">{customIds.has(selected.id) ? "Bài tự thêm" : "Bài gốc"}</p>
-            </div>
-            <div className="space-y-6">
-              {[
-                { label: "Mục tiêu", value: selected.objective },
-                { label: "Hướng dẫn", value: selected.instruction },
-                { label: "Tiêu chí", value: selected.criteria },
-              ].map(field => <div key={field.label}><h3 className="text-sm font-medium">{field.label}</h3><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{field.value || "Chưa có nội dung"}</p></div>)}
-              {!!selected.scores.length && <div><h3 className="text-sm font-medium">Thang điểm</h3><div className="mt-3 space-y-2">{selected.scores.map(score => <div key={score.id} className="flex items-start gap-3 rounded-md bg-muted/50 p-3"><span className="rounded bg-accent px-2 py-1 text-xs font-medium text-primary">{score.label}</span><p className="whitespace-pre-wrap text-sm leading-relaxed">{score.criteria || "Chưa có tiêu chí"}</p></div>)}</div></div>}
-            </div>
-          </> : <p className="text-sm text-muted-foreground">Chọn bài học trong cây bên trái để xem nội dung.</p>}
+      <div className="library-sections grid min-h-0 flex-1 grid-cols-[160px_minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[220px_minmax(0,1fr)]">
+        <aside aria-label="Lọc nhóm bài học" className="h-full min-h-0 overflow-y-auto overscroll-contain rounded-lg bg-card p-3">
+          <h2 className="px-2 py-2 text-sm font-medium">Nhóm bài học</h2>
+          <Label className="mb-2 flex cursor-pointer items-center gap-3 border-b px-2 py-3">
+            <Checkbox aria-label="Tất cả nhóm" checked={allChecked ? true : selectedGroupCount ? "indeterminate" : false} onCheckedChange={checked => setGroupFilter(checked === true ? { kind: "all" } : { kind: "selected", groups: new Set() })} />
+            <span>Tất cả nhóm</span>
+          </Label>
+          {groups.map(group => <Label key={group.name} className={`flex cursor-pointer items-center gap-3 rounded-md px-2 py-2.5 hover:bg-muted ${isGroupSelected(group.name) ? "text-primary" : ""}`}>
+            <Checkbox aria-label={`Nhóm ${group.name}`} checked={isGroupSelected(group.name)} onCheckedChange={checked => toggleGroup(group.name, checked === true)} />
+            <span>Nhóm {group.name}</span><span className="ml-auto text-xs text-muted-foreground">{group.lessons.length}</span>
+          </Label>)}
+        </aside>
+        <section aria-label="Danh sách bài học" className="h-full min-h-0 min-w-0 overflow-auto overscroll-contain rounded-lg bg-card px-5 pb-5">
+          <table className="dashboard-table w-full min-w-[600px]">
+            <thead className="sticky top-0 z-10"><tr><th className="p-4">Mã bài</th><th className="p-4">Tên bài</th><th className="p-4">Nguồn</th><th className="p-4"><span className="sr-only">Chi tiết</span></th></tr></thead>
+            <tbody>{lessons.map(lesson => <tr key={lesson.id}>
+              <td className="p-4"><span className="rounded-md bg-accent px-2.5 py-1.5 text-xs font-medium text-primary">{lesson.code}</span></td>
+              <td className="p-4"><button className="text-left underline-offset-4 hover:text-primary hover:underline" onClick={() => setSelectedId(lesson.id)}>{lesson.name || "Chưa có tên bài"}</button></td>
+              <td className="whitespace-nowrap p-4 text-muted-foreground">{customIds.has(lesson.id) ? "Tự thêm" : "Bài gốc"}</td>
+              <td className="p-4 text-right"><Button variant="outline" size="sm" aria-label={`Chi tiết bài ${lesson.code}`} onClick={() => setSelectedId(lesson.id)}>Chi tiết</Button></td>
+            </tr>)}</tbody>
+          </table>
+          {!lessons.length && <p className="p-8 text-center text-sm text-muted-foreground">Không tìm thấy bài phù hợp với nhóm và nội dung đang lọc.</p>}
         </section>
       </div>
+      {selected && <Dialog open onOpenChange={open => { if (!open) setSelectedId(null); }}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader><DialogTitle>{selected.code} · {selected.name || "Bài học"}</DialogTitle><DialogDescription>Nội dung tham khảo để soạn kế hoạch.</DialogDescription></DialogHeader>
+          {[
+            { label: "Mục tiêu", value: selected.objective },
+            { label: "Hướng dẫn", value: selected.instruction },
+            { label: "Tiêu chí", value: selected.criteria },
+          ].map(field => <div key={field.label}><h2 className="text-sm font-medium">{field.label}</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed">{field.value || "Chưa có nội dung"}</p></div>)}
+          {!!selected.scores.length && <div><h2 className="text-sm font-medium">Thang điểm</h2><div className="mt-3 space-y-2">{selected.scores.map(score => <div key={score.id} className="flex items-start gap-3 rounded-md bg-muted/50 p-3"><span className="rounded bg-accent px-2 py-1 text-xs font-medium text-primary">{score.label}</span><p className="whitespace-pre-wrap text-sm leading-relaxed">{score.criteria || "Chưa có tiêu chí"}</p></div>)}</div></div>}
+        </DialogContent>
+      </Dialog>}
       {adding && <NewLessonDialog close={() => setAdding(false)} saved={lesson => {
         setCustom(all => [...all, lesson]);
-        setSelectedId(lesson.id);
-        setExpanded(current => new Set([...current, lessonGroup(lesson.code)]));
+        setGroupFilter(current => current.kind === "all" ? current : { kind: "selected", groups: new Set([...current.groups, lessonGroup(lesson.code)]) });
         setQuery("");
         setAdding(false);
         setError("");
