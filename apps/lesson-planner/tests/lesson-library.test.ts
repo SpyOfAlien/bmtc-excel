@@ -47,7 +47,7 @@ it("combines search with the selected groups and opens details for a list item",
   await renderLibrary();
   act(() => button("Tất cả nhóm").click());
   act(() => button("Nhóm B").click());
-  const field = document.querySelector('input[type="search"]');
+  const field = document.querySelector('input[placeholder="Mã bài, tên hoặc mục tiêu…"]');
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
   if (!(field instanceof HTMLInputElement) || !setter) throw new Error("Missing search");
   act(() => { setter.call(field, "B2"); field.dispatchEvent(new Event("input", { bubbles: true })); });
@@ -56,4 +56,22 @@ it("combines search with the selected groups and opens details for a list item",
   expect(button("Nhóm B").getAttribute("aria-checked")).toBe("true");
   act(() => button("Chi tiết bài B2").click());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(bundledTemplate().lessons.get("b2")?.name);
+});
+
+it("filters numeric prefixes without regrouping when the lesson search narrows to one result", async () => {
+  await renderLibrary();
+  act(() => button("Tất cả nhóm").click());
+  act(() => button("Nhóm 1TNN").click());
+  const groupSearch = document.querySelector('input[aria-label="Tìm nhóm bài học"]');
+  const lessonSearch = document.querySelector('input[placeholder="Mã bài, tên hoặc mục tiêu…"]');
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  if (!(groupSearch instanceof HTMLInputElement) || !(lessonSearch instanceof HTMLInputElement) || !setter) throw new Error("Missing search");
+  act(() => { setter.call(groupSearch, "1TNN"); groupSearch.dispatchEvent(new Event("input", { bubbles: true })); });
+  expect(document.querySelector('button[aria-label="Nhóm A"]')).toBeNull();
+  expect(button("Nhóm 1TNN").getAttribute("aria-checked")).toBe("true");
+  const target = visibleCodes()[0];
+  if (!target) throw new Error("Missing numeric-prefix lesson");
+  act(() => { setter.call(lessonSearch, target); lessonSearch.dispatchEvent(new Event("input", { bubbles: true })); });
+  expect(visibleCodes()).toContain(target);
+  expect(visibleCodes().every(code => code.startsWith("1TNN"))).toBe(true);
 });

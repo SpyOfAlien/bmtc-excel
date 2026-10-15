@@ -5,7 +5,7 @@ import { bundledTemplate } from "@/lib/bundled-template";
 import { extendTemplate, listLessons } from "@/lib/storage-client";
 import type { Lesson } from "@/lib/workbook";
 import { NewLessonDialog } from "./storage-dialogs";
-import { groupLessons, lessonGroup } from "@/lib/lesson-groups";
+import { groupLessons } from "@/lib/lesson-groups";
 import { Search, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -20,6 +20,7 @@ export function LessonLibrary() {
   const base = useMemo(() => bundledTemplate(), []);
   const [custom, setCustom] = useState<Lesson[]>([]);
   const [query, setQuery] = useState("");
+  const [groupQuery, setGroupQuery] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -59,15 +60,13 @@ export function LessonLibrary() {
     [base, custom],
   );
   const key = query.trim().toLocaleLowerCase("vi");
-  const searched = catalog.filter((lesson) =>
-    `${lesson.code} ${lesson.name} ${lesson.objective}`
-      .toLocaleLowerCase("vi")
-      .includes(key),
-  );
   const customIds = new Set(custom.map((lesson) => lesson.id));
-  const groups = groupLessons(catalog);
+  const groups = useMemo(() => groupLessons(catalog), [catalog]);
+  const visibleGroups = groups.filter(group => group.name.toLocaleLowerCase("vi").includes(groupQuery.trim().toLocaleLowerCase("vi")));
   const isGroupSelected = (group: string) => groupFilter.kind === "all" || groupFilter.groups.has(group);
-  const lessons = groupLessons(searched).flatMap(group => isGroupSelected(group.name) ? group.lessons : []);
+  const lessons = groups.flatMap(group => isGroupSelected(group.name) ? group.lessons.filter(lesson =>
+    `${lesson.code} ${lesson.name} ${lesson.objective}`.toLocaleLowerCase("vi").includes(key)
+  ) : []);
   const selected = catalog.find(lesson => lesson.id === selectedId) ?? null;
   const selectedGroupCount = groups.filter(group => isGroupSelected(group.name)).length;
   const allChecked = selectedGroupCount === groups.length;
@@ -81,7 +80,7 @@ export function LessonLibrary() {
   return (
     <main className="dashboard-page library-page">
       <h1 className="sr-only">Thư viện bài học</h1>
-      <div className="table-toolbar mb-1 flex shrink-0 min-h-[60px] flex-wrap items-center justify-between gap-3 rounded-t-lg bg-card px-5 py-3 sm:h-[60px] sm:flex-nowrap">
+      <div className="table-toolbar mb-1 rounded-t-lg bg-card">
         <p className="text-sm text-muted-foreground">
           {lessons.length} / {catalog.length} bài học
         </p>
@@ -119,16 +118,25 @@ export function LessonLibrary() {
         </div>
       )}
       <div className="library-sections grid min-h-0 flex-1 grid-cols-[160px_minmax(0,1fr)] gap-4 overflow-hidden lg:grid-cols-[220px_minmax(0,1fr)]">
-        <aside aria-label="Lọc nhóm bài học" className="h-full min-h-0 overflow-y-auto overscroll-contain rounded-lg bg-card p-3">
+        <aside aria-label="Lọc nhóm bài học" className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-card p-3">
+          <div className="shrink-0 bg-card">
           <h2 className="px-2 py-2 text-sm font-medium">Nhóm bài học</h2>
+          <Label className="block px-2 pb-2">
+            <span className="sr-only">Tìm nhóm bài học</span>
+            <div className="search-field"><Search aria-hidden="true" /><Input type="search" aria-label="Tìm nhóm bài học" placeholder="Tìm nhóm…" className="h-8 bg-muted pl-9" value={groupQuery} onChange={event => setGroupQuery(event.target.value)} /></div>
+          </Label>
           <Label className="mb-2 flex cursor-pointer items-center gap-3 border-b px-2 py-3">
             <Checkbox aria-label="Tất cả nhóm" checked={allChecked ? true : selectedGroupCount ? "indeterminate" : false} onCheckedChange={checked => setGroupFilter(checked === true ? { kind: "all" } : { kind: "selected", groups: new Set() })} />
             <span>Tất cả nhóm</span>
           </Label>
-          {groups.map(group => <Label key={group.name} className={`flex cursor-pointer items-center gap-3 rounded-md px-2 py-2.5 hover:bg-muted ${isGroupSelected(group.name) ? "text-primary" : ""}`}>
+          </div>
+          <div aria-label="Danh sách nhóm" className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {visibleGroups.map(group => <Label key={group.name} className={`flex cursor-pointer items-center gap-3 rounded-md px-2 py-2.5 hover:bg-muted ${isGroupSelected(group.name) ? "text-primary" : ""}`}>
             <Checkbox aria-label={`Nhóm ${group.name}`} checked={isGroupSelected(group.name)} onCheckedChange={checked => toggleGroup(group.name, checked === true)} />
             <span>Nhóm {group.name}</span><span className="ml-auto text-xs text-muted-foreground">{group.lessons.length}</span>
           </Label>)}
+          {!visibleGroups.length && <p className="px-2 py-4 text-xs text-muted-foreground">Không tìm thấy nhóm phù hợp.</p>}
+          </div>
         </aside>
         <section aria-label="Danh sách bài học" className="h-full min-h-0 min-w-0 overflow-auto overscroll-contain rounded-lg bg-card px-5 pb-5">
           <table className="dashboard-table w-full min-w-[600px]">
@@ -156,8 +164,10 @@ export function LessonLibrary() {
       </Dialog>}
       {adding && <NewLessonDialog close={() => setAdding(false)} saved={lesson => {
         setCustom(all => [...all, lesson]);
-        setGroupFilter(current => current.kind === "all" ? current : { kind: "selected", groups: new Set([...current.groups, lessonGroup(lesson.code)]) });
+        const newGroup = groupLessons([...catalog, lesson]).find(group => group.lessons.some(item => item.id === lesson.id));
+        setGroupFilter(current => current.kind === "all" ? current : { kind: "selected", groups: new Set([...current.groups, ...(newGroup ? [newGroup.name] : [])]) });
         setQuery("");
+        setGroupQuery("");
         setAdding(false);
         setError("");
       }} />}

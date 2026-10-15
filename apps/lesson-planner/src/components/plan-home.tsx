@@ -127,8 +127,8 @@ export function PlanHome({
         </div>
         <p className="mb-4 text-xs text-muted-foreground">Số lượt xuất được ghi nhận khi tải file hoặc lưu vào thư mục. Mở hộp thoại xuất chưa được tính.</p>
         {notice && <p role="status" className="mb-3 text-sm text-primary">{notice}</p>}
-        <Card className="gap-0 overflow-hidden py-0">
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b p-5">
+        <Card className="page-section gap-0 overflow-hidden py-0" aria-label="Kế hoạch đã lưu">
+          <div className="table-toolbar border-b">
             <div className="text-sm font-medium">
               Kế hoạch đã lưu
               {state.kind === "ready" && (
@@ -148,6 +148,7 @@ export function PlanHome({
               /></div>
             </Label>
           </div>
+          <div className="section-scroll">
           {state.kind === "loading" && (
             <p
               role="status"
@@ -195,7 +196,7 @@ export function PlanHome({
           {filtered.length > 0 && (
             <div className="overflow-x-auto px-5 pb-5">
               <table className="dashboard-table min-w-[900px]">
-                <thead className="text-xs text-muted-foreground">
+                <thead className="sticky top-0 z-10 text-xs text-muted-foreground">
                   <tr>
                     <th className="px-5 py-3 font-medium">Tên kế hoạch</th>
                     <th className="px-5 py-3 font-medium">Tháng / năm</th>
@@ -230,6 +231,7 @@ export function PlanHome({
               </table>
             </div>
           )}
+          </div>
         </Card>
       </main>
       {exporting && <ExportPlanDialog loaded={{ template: extendTemplate(bundledTemplate(), exporting.plan.lessons), filename: templateName, directory: null }} childrenPlans={exporting.plan.children} month={exporting.plan.month} year={exporting.plan.year} close={() => setExporting(null)} prepare={async ({ month, year }) => {

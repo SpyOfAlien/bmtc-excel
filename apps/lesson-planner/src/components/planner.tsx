@@ -84,22 +84,25 @@ function Header({
   exportAction,
   busy = false,
   children,
+  leadingAction,
 }: {
   children?: ReactNode;
+  leadingAction?: ReactNode;
   saveAction: () => void;
   exportAction?: () => void;
   busy?: boolean;
 }) {
   return (
-    <header className="topbar">
+    <div role="toolbar" aria-label="Thao tác kế hoạch" className="page-toolbar planner-toolbar">
       {children}
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="toolbar-actions flex shrink-0 items-center gap-2">
+        {leadingAction}
         <Button onClick={saveAction} disabled={busy}><Save aria-hidden="true" />Lưu giáo án</Button>
         <Button variant="outline" onClick={exportAction} disabled={!exportAction || busy}>
           <Download aria-hidden="true" />Xuất Excel
         </Button>
       </div>
-    </header>
+    </div>
   );
 }
 
@@ -722,21 +725,12 @@ function Workspace({
   if (!active) return null;
   return (
     <>
-      <Header saveAction={() => setPlanSaveDialog(true)} exportAction={openExport}>
+      <main className="dashboard-page planner-shell">
+      <Header saveAction={() => setPlanSaveDialog(true)} exportAction={openExport} leadingAction={
+        <Button variant="outline" disabled={importing} onClick={() => importInput.current?.click()}>{importing ? "Đang tải…" : "Tải kế hoạch có sẵn"}</Button>
+      }>
         <div className="workspace-heading">
-          <h1>
-            Kế hoạch tháng {period.month}
-            <span> / {period.year}</span>
-          </h1>
-          <div className="workspace-meta">
-            <Button
-              variant="outline"
-              disabled={importing}
-              onClick={() => importInput.current?.click()}
-            >
-              {importing ? "Đang tải…" : "Tải kế hoạch có sẵn"}
-            </Button>
-          </div>
+          <h1>Kế hoạch tháng {period.month}<span> / {period.year}</span></h1>
         </div>
       </Header>
       <input
@@ -750,7 +744,6 @@ function Workspace({
           if (file) void importPlanFile(file);
         }}
       />
-      <main className="planner-shell">
         <div className="students-bar">
           <nav className="student-tabs" aria-label="Danh sách học sinh">
             {children.map((c, i) => (
@@ -891,7 +884,6 @@ function Workspace({
             />
           </div>
           <div className="plan-footer">
-            <span>Ghi chú được xuất cùng bài học. Cột phụ để trống.</span>
             <span>Tối đa {template.slots.length} bài / học sinh</span>
           </div>
         </section>

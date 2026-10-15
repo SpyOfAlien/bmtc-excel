@@ -94,9 +94,6 @@
   .status {
     @apply my-3 text-sm text-destructive empty:hidden;
   }
-  .planner-shell {
-    @apply mx-auto min-h-[calc(100dvh-5rem)] max-w-[1920px] p-3 pt-4 sm:p-6 sm:pt-4 lg:p-8 lg:pt-4;
-  }
   .workspace-heading {
     @apply flex flex-1 flex-wrap items-center justify-between gap-4;
   }
@@ -245,7 +242,7 @@
   .sidebar-link[aria-current="page"] { @apply bg-primary text-white shadow-sm shadow-primary/10; }
   .app-header { @apply flex h-16 items-center justify-between gap-4 border-b bg-card px-4 sm:px-6; }
   .profile-avatar { @apply grid size-8 place-items-center rounded-full bg-accent text-xs font-semibold text-primary; }
-  .dashboard-page { @apply mx-auto max-w-[1600px] p-4 sm:p-6; }
+  .dashboard-page { @apply mx-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden max-w-[1600px] p-4 sm:p-6; }
   .page-toolbar { @apply mb-4 flex min-h-12 flex-wrap items-center justify-between gap-3 rounded-lg border border-white bg-card px-4 py-1.5; }
   .page-toolbar > div { @apply flex min-w-0 items-center gap-4; }
   .page-toolbar h1 { @apply shrink-0 text-base leading-6; }
@@ -305,31 +302,93 @@
   justify-content: center;
 }
 
-.app-frame.has-contained-page {
+.app-frame {
   display: flex;
   flex-direction: column;
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
 }
-.has-contained-page .app-sidebar,
-.has-contained-page .app-header {
+.app-sidebar,
+.app-header {
   flex-shrink: 0;
 }
-.has-contained-page .app-content {
+.app-content {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
-.library-page {
+.app-page {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  width: 100%;
+  min-width: 0;
   overflow: hidden;
 }
-@media (min-width: 768px) {
-  .app-frame.has-contained-page { flex-direction: row; }
+.page-section, .section-scroll {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
+.page-section {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.section-scroll {
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.dashboard-page > p, .dashboard-page > [role="alert"] {
+  flex-shrink: 0;
+}
+.page-toolbar, .table-toolbar, .topbar, .lesson-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  height: 64px;
+  min-height: 64px;
+  gap: 12px;
+  padding: 0 20px;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+}
+.page-toolbar > div { flex: 1; }
+.table-toolbar > p, .table-toolbar > div, .topbar > div { flex-shrink: 0; }
+.planner-shell .students-bar {
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+  min-height: 48px;
+  margin-bottom: 12px;
+}
+.planner-shell .student-tabs { flex: 1; }
+.planner-shell .student-card {
+  flex-shrink: 0;
+  max-height: 35%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.planner-shell .plan-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin: 12px 0 0;
+  overflow: hidden;
+}
+.plan-panel .lesson-toolbar { margin-bottom: 0; padding: 0; }
+.plan-panel > p, .plan-panel > [role="alert"], .plan-footer { flex-shrink: 0; }
+.plan-panel .lesson-grid { flex: 1; min-height: 0; height: auto; }
+.topbar .workspace-heading { flex-wrap: nowrap; min-width: max-content; }
+.topbar .workspace-meta { flex-wrap: nowrap; }
+@media (min-width: 768px) {
+  .app-frame { flex-direction: row; }
+}
+
+.page-toolbar > .toolbar-actions { flex: 0 0 auto; }
+.planner-toolbar .toolbar-actions > button { height: 32px; }
+.planner-toolbar .workspace-heading { flex-wrap: nowrap; min-width: max-content; }
