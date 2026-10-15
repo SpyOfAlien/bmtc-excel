@@ -172,28 +172,40 @@ describe("values-only multi-child export", () => {
     expect(files["xl/drawings/child2_drawing9.xml"]).toBeDefined();
     expect(elements(xml(files["xl/workbook.xml"]), "sheet").map(s => s.getAttribute("name"))).toEqual(["Bé An", "Bé Bình"]);
   });
-  it("keeps only used cells and a single outside border for each child", async () => {
+  it("keeps only used cells and the template's grid, alignment and widths", async () => {
     const files = unzipSync(await exportWorkbook(template, [child("An", ["A1"]), child("Bình", ["A1", "A5"])]));
     const styles = xml(files["xl/styles.xml"]);
     const xfs = Array.from(elements(styles, "cellXfs")[0]?.children ?? []);
     const borders = Array.from(elements(styles, "borders")[0]?.children ?? []);
+    const original = xml(template.parts.get(template.sheetPath));
+    const originalStyle = (coord: string) => elements(original, "c").find(c => c.getAttribute("r") === coord)?.getAttribute("s");
     for (const [sheetNumber = 1, lessonCount = 1] of [[1, 1], [2, 2]]) {
       const sheet = xml(files[`xl/worksheets/sheet${sheetNumber}.xml`]);
       expect(elements(sheet, "row")).toHaveLength(8 + lessonCount);
-      expect(elements(sheet, "sheetView")[0]?.getAttribute("showGridLines")).toBe("0");
+      expect(elements(sheet, "sheetView")[0]?.hasAttribute("showGridLines")).toBe(false);
+      expect(elements(sheet, "col").map(col => col.getAttribute("width"))).toEqual(elements(original, "col").slice(0, 7).map(col => col.getAttribute("width")));
       for (const cell of elements(sheet, "c")) {
         const coord = cell.getAttribute("r") ?? "";
         const row = Number(coord.replace(/\D/g, ""));
+        expect(coord).toMatch(/^[A-G]\d+$/);
+        if (row < 9) {
+          expect(cell.getAttribute("s")).toBe(originalStyle(coord));
+          continue;
+        }
         const style = xfs[Number(cell.getAttribute("s"))];
         const border = borders[Number(style?.getAttribute("borderId"))];
-        for (const side of ["left", "right", "top", "bottom"]) {
-          const expected = side === "left" && coord.startsWith("A") || side === "right" && coord.startsWith("G") || side === "top" && row === 1 || side === "bottom" && row === 8 + lessonCount;
-          expect(Array.from(border?.children ?? []).find(edge => edge.localName === side)?.getAttribute("style")).toBe(expected ? "thin" : null);
-        }
-        expect(coord).toMatch(/^[A-G]\d+$/);
-        if (row >= 9) expect(style?.querySelector("alignment")?.getAttribute("wrapText")).toBe("1");
+        for (const side of ["left", "right", "top", "bottom"])
+          expect(Array.from(border?.children ?? []).find(edge => edge.localName === side)?.getAttribute("style")).toBe("thin");
+        const alignment = style?.querySelector("alignment");
+        expect(alignment?.getAttribute("wrapText")).toBe("1");
+        expect(alignment?.getAttribute("vertical")).toBe(coord.startsWith("G") ? "top" : "center");
       }
     }
+  });
+  it("shows only the month of the plan period in the sheet header", async () => {
+    const plan = { ...child(), period: "Tháng 11/2026" };
+    const sheet = xml(unzipSync(await exportWorkbook(template, [plan]))["xl/worksheets/sheet1.xml"]);
+    expect(value(sheet, "G6")).toBe("Tháng 11");
   });
   it("sizes wrapped rows to content and removes score merges inherited from the template", async () => {
     const plan = child("An", Array.from({ length: 19 }, (_, i) => `A${i + 1}`));
@@ -231,7 +243,7 @@ describe("values-only multi-child export", () => {
     expect(value(document, "C6")).toBe("=not a formula & <name>");
     expect(value(document, "A1")).toBe(template.values.get("A1"));
     expect(value(document, "F6")).toBe("5 tuổi");
-    expect(value(document, "G6")).toBe("Tháng / Tuần\nTháng 10 / Tuần 2");
+    expect(value(document, "G6")).toBe("Tháng 10 / Tuần 2");
     expect(value(document, "A9")).toBe("A5");
     expect(value(document, "E9")).toBe("1");
     expect(value(document, "F9")).toBe(template.lessons.get("a5")?.scores.at(-1)?.criteria);
