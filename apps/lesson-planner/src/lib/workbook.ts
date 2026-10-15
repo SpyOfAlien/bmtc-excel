@@ -662,8 +662,8 @@ export function validatePlans(
         throw new Error(`${name}: bài ${lesson.code} đã được chọn.`);
       used.add(key);
       const score = lesson.scores.find((s) => s.id === row.scoreId) ?? null;
-      const manualScore = row.origin === "excel" || !lesson.scores.length;
-      if (manualScore ? !row.manual.score.trim() : !score)
+      const manualScore = row.origin === "excel";
+      if (lesson.scores.length && (manualScore ? !row.manual.score.trim() : !score))
         throw new Error(
           `${name}, bài ${rowIndex + 1}: chưa ${manualScore ? "nhập" : "chọn"} điểm cần đạt hợp lệ.`,
         );

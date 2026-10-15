@@ -79,6 +79,8 @@ describe("real workbook parsing", () => {
     const wrong = child();
     wrong.lessons = [{ id: "1", lessonId: null, code: "A5", scoreId: "3", notes: "", manual: emptyManualFields() }];
     expect(() => validatePlans(template, [wrong])).toThrow("điểm cần đạt");
+    wrong.lessons = wrong.lessons.map(row => ({ ...row, scoreId: "", origin: "excel" }));
+    expect(() => validatePlans(template, [wrong])).toThrow("chưa nhập điểm");
   });
   it("rejects invalid archives and mismatched templates", () => {
     expect(() => readTemplate(new Uint8Array([1, 2, 3]))).toThrow();
@@ -89,6 +91,22 @@ describe("real workbook parsing", () => {
 });
 
 describe("values-only multi-child export", () => {
+  it("exports and reimports unscored lessons with blank scores", async () => {
+    const lesson = Array.from(template.lessons.values()).find(item => !item.scores.length);
+    if (!lesson) throw new Error("Missing unscored fixture");
+    const plan = child();
+    plan.lessons.push({ id: crypto.randomUUID(), lessonId: lesson.id, code: lesson.code, scoreId: "", notes: "Không cần điểm", manual: emptyManualFields() });
+    const bytes = await exportWorkbook(template, [plan]);
+    const sheet = xml(unzipSync(bytes)["xl/worksheets/sheet1.xml"]);
+    expect(value(sheet, "A10")).toBe(lesson.code);
+    expect(value(sheet, "E10")).toBeNull();
+    expect(value(sheet, "G10")).toBe("Không cần điểm");
+    const imported = importPlans(bytes, template);
+    expect(required(required(imported[0]).lessons[1]).manual.score).toBe("");
+    const restored = xml(unzipSync(await exportWorkbook(template, imported))["xl/worksheets/sheet1.xml"]);
+    expect(value(restored, "A10")).toBe(lesson.code);
+    expect(value(restored, "E10")).toBeNull();
+  });
   it("exports free text and manual scores only for missing reference content", async () => {
     const original = template.lessons.get("a5");
     if (!original) throw new Error("Missing A5 fixture");
@@ -107,7 +125,7 @@ describe("values-only multi-child export", () => {
     expect(value(referenceSheet, "B9")).toBe(template.lessons.get("a1")?.name);
     expect(value(referenceSheet, "E9")).toBe("1");
     plan.lessons = plan.lessons.map(row => ({ ...row, manual: { ...row.manual, score: " " } }));
-    expect(() => validatePlans(incomplete, [plan])).toThrow("chưa nhập điểm");
+    expect(validatePlans(incomplete, [plan])[0]?.lessons[0]?.fields.score).toBe("");
     plan.lessons = plan.lessons.map(row => ({ ...row, manual: { ...row.manual, score: "2", objective: "\u0000" } }));
     expect(() => validatePlans(incomplete, [plan])).toThrow("ký tự không hợp lệ");
   });
