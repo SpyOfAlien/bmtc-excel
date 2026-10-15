@@ -235,9 +235,7 @@
   .app-frame { @apply min-h-dvh w-full bg-background; }
   .app-sidebar { @apply border-b bg-card md:sticky md:top-0 md:h-dvh md:w-52 md:shrink-0 md:border-r md:border-b-0; }
   .app-logo { @apply flex items-center gap-2.5 px-5 py-6 text-lg font-semibold tracking-tight; }
-  .app-logo-mark { @apply relative h-6 w-6 rounded-l-full rounded-r-md bg-primary; }
-  .app-logo-mark::after { content: ""; @apply absolute top-0 -right-1 h-6 w-1 rounded-sm bg-primary; }
-  .sidebar-label { @apply mb-2 px-6 text-[10px] font-medium tracking-wider text-muted-foreground; }
+  .app-logo-mark { @apply size-8 shrink-0; }
   .sidebar-link { @apply flex items-center gap-3 rounded-lg px-3 py-3 text-[13px] text-muted-foreground transition-colors hover:bg-muted; }
   .sidebar-link[aria-current="page"] { @apply bg-primary text-white shadow-sm shadow-primary/10; }
   .app-header { @apply flex h-16 items-center justify-between gap-4 border-b bg-card px-4 sm:px-6; }

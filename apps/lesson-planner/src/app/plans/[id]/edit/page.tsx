@@ -6,6 +6,6 @@ export function generateStaticParams() {
   return [{ id: "detail" }];
 }
 
-export default function PlanDetailPage() {
+export default function EditPlanPage() {
   return <Suspense fallback={<p role="status" className="p-8">Đang tải kế hoạch…</p>}><Planner /></Suspense>;
 }

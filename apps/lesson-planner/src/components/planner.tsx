@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { planIdFromPath } from "@/lib/plan-routes";
 import { usePathname } from "next/navigation";
 import { useAppNavigation } from "./app-shell";
 import { nextPlanMonth } from "@/lib/plan-utils";
@@ -54,6 +55,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import { TableToolbar } from "./table-toolbar";
 import { Badge } from "@/components/ui/badge";
 import { SearchPicker } from "./search-picker";
 import { MonthPicker } from "./month-picker";
@@ -117,7 +119,7 @@ interface LoadedTemplate {
 
 export default function Planner() {
   const pathname = usePathname();
-  const planId = pathname?.match(/^\/plans\/([^/]+)\/?$/)?.[1] ?? null;
+  const planId = pathname ? planIdFromPath(pathname) : null;
   const [retry, setRetry] = useState(0);
   const [state, setState] = useState<
     | { kind: "loading" }
@@ -711,7 +713,7 @@ function Workspace({
     setPeriod(savedPeriod);
     setBaseline({ children: current, period: savedPeriod });
     setPlanSaveDialog(false);
-    setToast("Đã lưu giáo án. Bạn có thể mở lại từ Trang chủ.");
+    setToast("Đã lưu giáo án. Bạn có thể mở lại từ danh sách Kế hoạch.");
     return current;
   }
   function openExport() {
@@ -833,23 +835,13 @@ function Workspace({
           </div>
         </Card>
         <section className="plan-panel" aria-label="Kế hoạch bài học">
-          <div className="lesson-toolbar">
-            <div>
-              <h2>
-                Kế hoạch bài học{" "}
-                <Badge variant="secondary" className="count">
-                  {active.lessons.length}
-                </Badge>
-              </h2>
-            </div>
-          </div>
+          <TableToolbar label="Công cụ bài học" title={<h2>Kế hoạch bài học <Badge variant="secondary" className="count">{active.lessons.length}</Badge></h2>} />
           {storageError && (
             <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md border bg-card px-4 py-3 text-xs text-muted-foreground" role="alert">
               <span>{storageError}</span>
               <Button variant="outline" size="sm" onClick={() => void refreshLessons()}>Thử lại</Button>
             </div>
           )}
-          <p className="mb-3 text-xs text-muted-foreground">Nhấn Thêm bài để chọn bài từ Thư viện. Chọn điểm cần đạt để lấy tiêu chí tương ứng. Lưu giáo án để giữ thay đổi; Xuất Excel tạo file tải về.</p>
           <div className="lesson-grid" aria-label="Bảng bài học">
             <AgGridReact<TableRow>
               theme={theme}
@@ -882,9 +874,6 @@ function Workspace({
               noRowsOverlayComponent={AddLessonRow}
               noRowsOverlayComponentParams={{ onAdd: addRow, empty: true }}
             />
-          </div>
-          <div className="plan-footer">
-            <span>Tối đa {template.slots.length} bài / học sinh</span>
           </div>
         </section>
       </main>

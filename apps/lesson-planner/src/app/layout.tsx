@@ -4,7 +4,7 @@ import "./globals.css";
 import { AppShell } from "@/components/app-shell";
 
 export const metadata: Metadata = {
-  title: "Kế hoạch cá nhân · Hương Nắng",
+  title: "Kế hoạch cá nhân · Hoasalbee",
   description:
     "Lập kế hoạch giáo dục cá nhân từ mẫu Excel, xử lý trực tiếp trên thiết bị của bạn.",
 };

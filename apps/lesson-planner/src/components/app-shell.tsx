@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
+import { SunflowerLogo } from "./sunflower-logo";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -21,7 +22,7 @@ import {
 } from "./ui/dialog";
 import { currentUser } from "@/lib/storage-client";
 import { fullName } from "@/lib/user-profile";
-import { House, NotebookPen, Library, ChevronRight, UsersRound, PanelLeftOpen, PanelLeftClose } from "lucide-react";
+import { NotebookPen, Library, ChevronRight, UsersRound, PanelLeftOpen, PanelLeftClose } from "lucide-react";
 
 const NavigationContext = createContext({
   navigate: (_href: string) => {},
@@ -29,10 +30,9 @@ const NavigationContext = createContext({
 });
 export const useAppNavigation = () => useContext(NavigationContext);
 const items = [
-  { href: "/", label: "Trang chủ", icon: House },
-  { href: "/plans/", label: "Kế hoạch", icon: NotebookPen },
-  { href: "/students/", label: "Học sinh", icon: UsersRound },
-  { href: "/library/", label: "Thư viện", icon: Library },
+  { href: "/plans", label: "Kế hoạch", icon: NotebookPen },
+  { href: "/students", label: "Học sinh", icon: UsersRound },
+  { href: "/library", label: "Thư viện", icon: Library },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -40,8 +40,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [profileName, setProfileName] = useState("");
   useEffect(() => { let cancelled = false; void currentUser().then(user => { if (!cancelled) setProfileName(fullName(user)); }).catch(() => {}); return () => { cancelled = true; }; }, []);
   const path = usePathname();
-  const pathname = path === "/" ? path : `${path.replace(/\/+$/, "")}/`;
-  const currentItem = items.find(item => item.href === pathname || (item.href !== "/" && pathname.startsWith(item.href)));
+  const pathname = path === "/" ? path : path.replace(/\/+$/, "");
+  const currentItem = items.find(item => item.href === pathname || pathname.startsWith(`${item.href}/`));
   const router = useRouter();
   const dirty = useRef(false);
   const [pending, setPending] = useState<string | null>(null);
@@ -64,8 +64,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="app-frame md:flex">
         <aside className={`app-sidebar ${expanded ? "is-expanded" : "is-collapsed"}`}>
           <div className="sidebar-toggle"><Button variant="ghost" size={expanded ? "default" : "icon"} aria-label={expanded ? "Thu gọn sidebar" : "Mở rộng sidebar"} aria-expanded={expanded} aria-controls="main-navigation" title={expanded ? "Thu gọn" : "Mở rộng"} onClick={() => setExpanded(value => !value)}>{expanded ? <PanelLeftClose aria-hidden="true" /> : <PanelLeftOpen aria-hidden="true" />}{expanded && <span>Thu gọn</span>}</Button></div>
-          <div className="app-logo"><span className="app-logo-mark" aria-hidden="true" /><span className={expanded ? "" : "sr-only"}>Hương Nắng</span></div>
-          <p className={expanded ? "sidebar-label" : "sr-only"}>KHÔNG GIAN LÀM VIỆC</p>
+          <div className="app-logo"><SunflowerLogo /><span className={expanded ? "" : "sr-only"}>Hoasalbee</span></div>
           <nav
             id="main-navigation"
             aria-label="Điều hướng chính"

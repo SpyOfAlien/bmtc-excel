@@ -7,19 +7,19 @@ import type {
   SavedPlan,
   UserProfile,
 } from "../lib/storage-schema";
-import { FileText, Search, Plus, ArrowUpRight, Download, Copy } from "lucide-react";
+import { FileText, Plus, Download, Copy } from "lucide-react";
 import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
+import { TableToolbar } from "./table-toolbar";
 import { ExportPlanDialog } from "./export-plan-dialog";
 import { bundledTemplate, templateName } from "@/lib/bundled-template";
 import { validatePlans } from "@/lib/workbook";
+import { planEditPath } from "@/lib/plan-routes";
 import { copyPlan } from "@/lib/plan-utils";
 import { Card } from "./ui/card";
 
 const message = (error: unknown) =>
   error instanceof Error ? error.message : "Không tải được danh sách kế hoạch.";
-type HomeState =
+type PlanListState =
   | { kind: "loading" }
   | {
       kind: "ready";
@@ -28,12 +28,12 @@ type HomeState =
       error: string;
     };
 
-export function PlanHome({
+export function PlanList({
   create,
 }: {
   create: () => void;
 }) {
-  const [state, setState] = useState<HomeState>({ kind: "loading" });
+  const [state, setState] = useState<PlanListState>({ kind: "loading" });
   const [exporting, setExporting] = useState<SavedPlan | null>(null);
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
@@ -128,26 +128,7 @@ export function PlanHome({
         <p className="mb-4 text-xs text-muted-foreground">Số lượt xuất được ghi nhận khi tải file hoặc lưu vào thư mục. Mở hộp thoại xuất chưa được tính.</p>
         {notice && <p role="status" className="mb-3 text-sm text-primary">{notice}</p>}
         <Card className="page-section gap-0 overflow-hidden py-0" aria-label="Kế hoạch đã lưu">
-          <div className="table-toolbar border-b">
-            <div className="text-sm font-medium">
-              Kế hoạch đã lưu
-              {state.kind === "ready" && (
-                <span className="ml-2 font-normal text-muted-foreground">
-                  ({plans.length})
-                </span>
-              )}
-            </div>
-            <Label className="grid gap-2 text-xs text-muted-foreground">
-              <span className="sr-only">Tìm kế hoạch</span>
-              <div className="search-field"><Search aria-hidden="true" /><Input
-                type="search"
-                className="w-64 max-w-full border-transparent bg-muted pl-9 shadow-none"
-                placeholder="Tên kế hoạch hoặc tháng/năm…"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              /></div>
-            </Label>
-          </div>
+          <TableToolbar label="Công cụ danh sách kế hoạch" title={<>Kế hoạch đã lưu{state.kind === "ready" && <span className="ml-2 font-normal text-muted-foreground">({plans.length})</span>}</>} search={{ label: "Tìm kế hoạch", placeholder: "Tên kế hoạch hoặc tháng/năm…", value: query, change: setQuery }} />
           <div className="section-scroll">
           {state.kind === "loading" && (
             <p
@@ -203,14 +184,14 @@ export function PlanHome({
                     <th className="px-5 py-3 font-medium">Cập nhật gần nhất</th>
                     <th className="px-5 py-3 font-medium">Lượt xuất</th>
                     <th className="px-5 py-3">
-                      <span className="sr-only">Mở kế hoạch</span>
+                      <span className="sr-only">Thao tác kế hoạch</span>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map((plan) => (
                     <tr key={plan.id} className="border-t hover:bg-muted/20">
-                      <td className="min-w-60 px-5 py-4 font-medium"><div className="flex items-center gap-3"><span className="table-icon"><FileText className="size-4" aria-hidden="true" /></span><a href={`/plans/${encodeURIComponent(plan.id)}/`} className="text-primary underline-offset-4 hover:underline focus-visible:underline">{plan.title}</a></div></td>
+                      <td className="min-w-60 px-5 py-4 font-medium"><div className="flex items-center gap-3"><span className="table-icon"><FileText className="size-4" aria-hidden="true" /></span><a href={planEditPath(plan.id)} className="text-primary underline-offset-4 hover:underline focus-visible:underline">{plan.title}</a></div></td>
                       <td className="whitespace-nowrap px-5 py-4 text-muted-foreground">
                         {plan.month}/{plan.year}
                       </td>
@@ -219,9 +200,6 @@ export function PlanHome({
                       </td>
                       <td className="px-5 py-4"><span className="rounded-md bg-accent px-2 py-1 text-xs text-primary">{plan.exportCount}</span></td>
                       <td className="px-5 py-4 text-right"><div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" asChild>
-                          <a href={`/plans/${encodeURIComponent(plan.id)}/`} aria-label={`Mở kế hoạch ${plan.title}`}>Mở kế hoạch<ArrowUpRight aria-hidden="true" /></a>
-                        </Button>
                         <Button variant="outline" size="sm" disabled={opening !== null} aria-label={`Sao chép kế hoạch ${plan.title}`} onClick={() => void duplicatePlan(plan.id)}><Copy aria-hidden="true" />Sao chép</Button>
                         <Button variant="outline" size="sm" disabled={opening !== null} aria-label={`Xuất Excel ${plan.title}`} onClick={() => void exportPlan(plan.id)}><Download aria-hidden="true" />Xuất Excel</Button></div>
                       </td>

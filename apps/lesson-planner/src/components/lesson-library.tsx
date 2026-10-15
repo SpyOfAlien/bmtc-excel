@@ -10,6 +10,7 @@ import { Search, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { TableToolbar } from "./table-toolbar";
 import { Checkbox } from "./ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./ui/dialog";
 
@@ -80,27 +81,7 @@ export function LessonLibrary() {
   return (
     <main className="dashboard-page library-page">
       <h1 className="sr-only">Thư viện bài học</h1>
-      <div className="table-toolbar mb-1 rounded-t-lg bg-card">
-        <p className="text-sm text-muted-foreground">
-          {lessons.length} / {catalog.length} bài học
-        </p>
-        <div className="ml-auto flex min-w-0 items-center gap-3">
-        <Label className="grid min-w-0 gap-2">
-          <span className="sr-only">Tìm bài học</span>
-          <div className="search-field"><Search aria-hidden="true" /><Input
-            type="search"
-            className="border-transparent bg-muted pl-9 shadow-none"
-            placeholder="Mã bài, tên hoặc mục tiêu…"
-            value={query}
-            onChange={event => {
-              setQuery(event.target.value);
-              setSelectedId(null);
-            }}
-          /></div>
-        </Label>
-        <Button className="h-9 shrink-0" onClick={() => setAdding(true)}><Plus aria-hidden="true" />Thêm bài mẫu</Button>
-        </div>
-      </div>
+      <TableToolbar label="Công cụ thư viện" className="mb-1" title={<span className="font-normal text-muted-foreground">{lessons.length} / {catalog.length} bài học</span>} search={{ label: "Tìm bài học", placeholder: "Mã bài, tên hoặc mục tiêu…", value: query, change: value => { setQuery(value); setSelectedId(null); } }} actions={<Button className="h-9 shrink-0" onClick={() => setAdding(true)}><Plus aria-hidden="true" />Thêm bài mẫu</Button>} />
       {loading && (
         <p role="status" className="mb-4 text-sm">
           Đang tải bài tự thêm…

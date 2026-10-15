@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Search, Pencil, UsersRound } from "lucide-react";
+import { Plus, Pencil, UsersRound } from "lucide-react";
 import { listStudents, createStudent, updateStudent } from "@/lib/storage-client";
 import type { Student } from "@/lib/storage-schema";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { TableToolbar } from "./table-toolbar";
 import { Label } from "./ui/label";
 import { Modal } from "./planner-modal";
 
@@ -19,7 +20,7 @@ export function StudentsScreen() {
   const filtered = students.filter(student => `${student.name} ${student.age}`.toLocaleLowerCase("vi").includes(query.trim().toLocaleLowerCase("vi")));
   return <main className="dashboard-page">
     <div className="page-toolbar"><div><h1>Quản lý học sinh</h1><p className="mt-2 text-sm text-muted-foreground">Hồ sơ học sinh của giáo viên hiện tại, dùng lại trong nhiều kế hoạch.</p></div><Button onClick={() => setEditor({ kind: "create" })}><Plus aria-hidden="true" />Thêm học sinh</Button></div>
-    <section className="page-section rounded-lg bg-card" aria-label="Danh sách học sinh"><div className="table-toolbar"><p className="text-sm text-muted-foreground">{filtered.length} / {students.length} học sinh</p><Label><span className="sr-only">Tìm học sinh</span><div className="search-field"><Search aria-hidden="true" /><Input type="search" className="border-transparent bg-muted pl-9 shadow-none" value={query} onChange={event => setQuery(event.target.value)} placeholder="Tên hoặc tuổi…" /></div></Label></div>
+    <section className="page-section rounded-lg bg-card" aria-label="Danh sách học sinh"><TableToolbar label="Công cụ danh sách học sinh" title={<span className="font-normal text-muted-foreground">{filtered.length} / {students.length} học sinh</span>} search={{ label: "Tìm học sinh", placeholder: "Tên hoặc tuổi…", value: query, change: setQuery }} />
       <div className="section-scroll px-5 pb-5">
       {loading && <p role="status" className="py-6 text-center text-sm">Đang tải học sinh…</p>}
       {error && <div role="alert" className="flex items-center gap-3 text-sm text-destructive">{error}<Button variant="outline" onClick={() => setRetry(value => value + 1)}>Thử lại</Button></div>}

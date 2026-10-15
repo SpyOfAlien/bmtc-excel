@@ -1,5 +1,5 @@
-import { HomeScreen } from "@/components/home-screen";
+import { DefaultRoute } from "@/components/default-route";
 
-export default function Home() {
-  return <HomeScreen />;
+export default function IndexPage() {
+  return <DefaultRoute />;
 }
