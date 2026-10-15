@@ -146,17 +146,19 @@ describe("values-only multi-child export", () => {
     expect(value(firstSheet, "F9")).toBe(template.lessons.get("a5")?.scores.at(-1)?.criteria);
     expect([value(secondSheet, "A9"), value(secondSheet, "A10")]).toEqual(["A1", "A5"]);
   });
-  it("preserves headers, columns, merges, print settings, existing style definitions and logo", async () => {
+  it("preserves header content, original style definitions and logo while bounding the print area", async () => {
     const files = unzipSync(await exportWorkbook(template, [child("Bé An"), child("Bé Bình")]));
     const exported = xml(files["xl/worksheets/sheet1.xml"]);
     const original = xml(template.parts.get(template.sheetPath));
-    for (const tag of ["cols", "mergeCells", "pageMargins", "pageSetup", "dimension", "sheetFormatPr", "conditionalFormatting"]) {
-      expect(elements(exported, tag)[0]?.outerHTML).toBe(elements(original, tag)[0]?.outerHTML);
-    }
-    const headerCells = (doc: Document) => elements(doc, "c").filter(c => Number((c.getAttribute("r") || "").replace(/\D/g, "")) < 9).map(c => [c.getAttribute("r"), c.getAttribute("s")]);
-    expect(headerCells(exported)).toEqual(headerCells(original));
-    const headerRows = (doc: Document) => elements(doc, "row").filter(r => Number(r.getAttribute("r")) < 9).map(r => [r.getAttribute("r"), r.getAttribute("ht")]);
-    expect(headerRows(exported)).toEqual(headerRows(original));
+    expect(elements(exported, "pageMargins")[0]?.outerHTML).toBe(elements(original, "pageMargins")[0]?.outerHTML);
+    expect(value(exported, "A1")).toBe(template.values.get("A1"));
+    expect(value(exported, "A4")).toBe(template.values.get("A4"));
+    expect(elements(exported, "dimension")[0]?.getAttribute("ref")).toBe("A1:G9");
+    expect(elements(exported, "col")).toHaveLength(7);
+    expect(elements(exported, "mergeCell").every(merge => !/E23/.test(merge.getAttribute("ref") ?? ""))).toBe(true);
+    expect(elements(exported, "pageSetup")[0]?.getAttribute("fitToWidth")).toBe("1");
+    expect(elements(exported, "pageSetup")[0]?.getAttribute("fitToHeight")).toBe("0");
+    expect(elements(xml(files["xl/workbook.xml"]), "definedName").map(node => node.textContent)).toEqual(["'Bé An'!$A$1:$G$9", "'Bé Bình'!$A$1:$G$9"]);
     const originalStyles = xml(template.parts.get("xl/styles.xml"));
     const exportedStyles = xml(files["xl/styles.xml"]);
     for (const tag of ["fonts", "fills", "numFmts", "dxfs"]) expect(elements(exportedStyles, tag)[0]?.outerHTML).toBe(elements(originalStyles, tag)[0]?.outerHTML);
@@ -170,26 +172,58 @@ describe("values-only multi-child export", () => {
     expect(files["xl/drawings/child2_drawing9.xml"]).toBeDefined();
     expect(elements(xml(files["xl/workbook.xml"]), "sheet").map(s => s.getAttribute("name"))).toEqual(["Bé An", "Bé Bình"]);
   });
-  it("borders empty lesson cells and enlarges only populated rows for each child", async () => {
+  it("keeps only used cells and a single outside border for each child", async () => {
     const files = unzipSync(await exportWorkbook(template, [child("An", ["A1"]), child("Bình", ["A1", "A5"])]));
     const styles = xml(files["xl/styles.xml"]);
     const xfs = Array.from(elements(styles, "cellXfs")[0]?.children ?? []);
     const borders = Array.from(elements(styles, "borders")[0]?.children ?? []);
-    for (const [sheetNumber, lessonCount] of [[1, 1], [2, 2]]) {
+    for (const [sheetNumber = 1, lessonCount = 1] of [[1, 1], [2, 2]]) {
       const sheet = xml(files[`xl/worksheets/sheet${sheetNumber}.xml`]);
-      for (const row of elements(sheet, "row").filter(r => Number(r.getAttribute("r")) >= 9)) {
-        const rowNumber = Number(row.getAttribute("r"));
-        expect(row.getAttribute("ht")).toBe(rowNumber < 9 + Number(lessonCount) ? "120" : "15");
-        expect(row.hasAttribute("hidden")).toBe(false);
-      }
-      for (const coord of ["A9", "G9", "A10", "G10", "A22", "E24", "A27", "G2321"]) {
-        const cell = elements(sheet, "c").find(c => c.getAttribute("r") === coord);
-        const style = xfs[Number(cell?.getAttribute("s"))];
+      expect(elements(sheet, "row")).toHaveLength(8 + lessonCount);
+      expect(elements(sheet, "sheetView")[0]?.getAttribute("showGridLines")).toBe("0");
+      for (const cell of elements(sheet, "c")) {
+        const coord = cell.getAttribute("r") ?? "";
+        const row = Number(coord.replace(/\D/g, ""));
+        const style = xfs[Number(cell.getAttribute("s"))];
         const border = borders[Number(style?.getAttribute("borderId"))];
-        for (const side of ["left", "right", "top", "bottom"]) expect(Array.from(border?.children ?? []).find(e => e.localName === side)?.getAttribute("style")).toBe("thin");
+        for (const side of ["left", "right", "top", "bottom"]) {
+          const expected = side === "left" && coord.startsWith("A") || side === "right" && coord.startsWith("G") || side === "top" && row === 1 || side === "bottom" && row === 8 + lessonCount;
+          expect(Array.from(border?.children ?? []).find(edge => edge.localName === side)?.getAttribute("style")).toBe(expected ? "thin" : null);
+        }
+        expect(coord).toMatch(/^[A-G]\d+$/);
+        if (row >= 9) expect(style?.querySelector("alignment")?.getAttribute("wrapText")).toBe("1");
       }
-      expect(value(sheet, "A22")).toBeNull();
     }
+  });
+  it("sizes wrapped rows to content and removes score merges inherited from the template", async () => {
+    const plan = child("An", Array.from({ length: 19 }, (_, i) => `A${i + 1}`));
+    plan.lessons[0] = { ...required(plan.lessons[0]), origin: "excel", manual: { ...emptyManualFields(), score: "2", instruction: "Hướng dẫn thực hiện từng bước. ".repeat(25) } };
+    const files = unzipSync(await exportWorkbook(template, [plan]));
+    const sheet = xml(files["xl/worksheets/sheet1.xml"]);
+    const height = (number: number) => Number(elements(sheet, "row").find(row => row.getAttribute("r") === String(number))?.getAttribute("ht"));
+    expect(height(9)).toBeGreaterThan(120);
+    expect(height(9)).toBeLessThanOrEqual(409);
+    expect(height(10)).toBeLessThan(height(9));
+    expect(elements(sheet, "mergeCell").every(merge => !/\d{2}/.test(merge.getAttribute("ref") ?? ""))).toBe(true);
+    expect(value(sheet, "E23")).toBeTruthy();
+    expect(value(sheet, "E24")).toBeTruthy();
+  });
+  it("shows very long lessons across merged rows without losing importable content", async () => {
+    const plan = child();
+    const instruction = "Mỗi bước hướng dẫn cần được giữ nguyên và hiển thị đầy đủ.\n".repeat(70);
+    const row = required(plan.lessons[0]);
+    row.origin = "excel";
+    row.manual = { ...emptyManualFields(), instruction, score: "2" };
+    const bytes = await exportWorkbook(template, [plan]);
+    const sheet = xml(unzipSync(bytes)["xl/worksheets/sheet1.xml"]);
+    const merges = elements(sheet, "mergeCell").map(merge => merge.getAttribute("ref"));
+    expect(merges.some(ref => ref?.startsWith("D9:D"))).toBe(true);
+    const heights = elements(sheet, "row").filter(item => Number(item.getAttribute("r")) >= 9).map(item => Number(item.getAttribute("ht")));
+    expect(heights.every(height => height <= 409)).toBe(true);
+    expect(heights.reduce((sum, height) => sum + height, 0)).toBeGreaterThan(900);
+    const imported = importPlans(bytes, template);
+    expect(required(imported[0]).lessons).toHaveLength(1);
+    expect(required(required(imported[0]).lessons[0]).manual.instruction).toBe(instruction);
   });
   it("writes lookup values and removes old lessons, formulas and reference sheets", async () => {
     const files = unzipSync(await exportWorkbook(template, [child("=not a formula & <name>")]));
@@ -213,12 +247,13 @@ describe("values-only multi-child export", () => {
     expect(strFromU8(files["xl/worksheets/sheet1.xml"] || new Uint8Array())).not.toContain("BÉ HƯNG");
     expect(source).toEqual(sourceSnapshot);
   });
-  it("skips rows covered by the merged score cell", async () => {
+  it("exports lessons consecutively instead of inheriting empty merged rows", async () => {
     const codes = Array.from(template.lessons.values()).slice(0, 20).map(l => l.code);
     const files = unzipSync(await exportWorkbook(template, [child("An", codes)]));
     const document = xml(files["xl/worksheets/sheet1.xml"]);
-    for (const row of [24, 25, 26]) expect(value(document, `A${row}`)).toBeNull();
-    expect(value(document, "A27")).toBe(codes[15]);
+    expect(value(document, "A24")).toBe(codes[15]);
+    expect(value(document, "A25")).toBe(codes[16]);
+    expect(value(document, "A26")).toBe(codes[17]);
   });
   it("makes valid unique worksheet names without altering student names", () => {
     const names = sheetNames(["A/B:*?[]\\", "A/B:*?[]\\", "'", "History", "B".repeat(80), "b".repeat(80)]);

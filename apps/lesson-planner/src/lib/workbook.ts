@@ -1,6 +1,7 @@
 import catalogIndex from "../data/catalog-ids.json";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { resolveLessonFields } from "./lesson-fields";
+import { exportColumnWidths, wrappedCellHeight } from "./export-layout";
 
 const catalogIds = new Map<
   string,
@@ -743,43 +744,60 @@ function writeValue(cell: Element, value: CellValue | undefined) {
   }
 }
 
-/** Append border-only style variants so header styles and existing formats remain intact. */
+/** Append layout variants without changing the source template's styles. */
 function lessonTableStyles(template: Template) {
   const document = xmlPart(template.parts, "xl/styles.xml");
   const borders = descendants(document, "borders")[0],
-    xfs = descendants(document, "cellXfs")[0];
-  if (!borders || !xfs) throw new Error("Mẫu thiếu định dạng ô Excel.");
+    xfs = descendants(document, "cellXfs")[0],
+    fonts = descendants(document, "fonts")[0];
+  if (!borders || !xfs || !fonts) throw new Error("Mẫu thiếu định dạng ô Excel.");
   const originalStyles = Array.from(xfs.children);
-  const borderId = String(borders.children.length);
-  const border = append(borders, S, "border");
-  for (const side of ["left", "right", "top", "bottom"])
-    append(append(border, S, side, { style: "thin" }), S, "color", {
-      rgb: "FF000000",
-    });
-  append(border, S, "diagonal");
-  borders.setAttribute("count", String(borders.children.length));
-  const variants = new Map<number, string>();
-  const borderedStyle = (sourceId: string | null): string => {
-    const index = Number(sourceId ?? "0");
-    const existing = variants.get(index);
+  const variants = new Map<string, string>(), borderVariants = new Map<string, string>();
+  const sourceStyle = (sourceId: string | null) => {
+    const index = Number(sourceId ?? "0"), original = originalStyles[index];
+    if (!Number.isInteger(index) || !original) throw new Error("Mẫu có định dạng ô không hợp lệ.");
+    return original;
+  };
+  const fontSize = (sourceId: string | null): number => {
+    const font = fonts.children[Number(sourceStyle(sourceId).getAttribute("fontId") ?? "0")];
+    const size = Number(font && descendants(font, "sz")[0]?.getAttribute("val"));
+    return Number.isFinite(size) && size > 0 ? size : 11;
+  };
+  const layoutStyle = (sourceId: string | null, edges: string, body: boolean): string => {
+    const key = `${sourceId ?? "0"}:${edges}:${body}`;
+    const existing = variants.get(key);
     if (existing) return existing;
-    const original = originalStyles[index];
-    if (!Number.isInteger(index) || !original)
-      throw new Error("Mẫu có định dạng ô không hợp lệ.");
-    const clone = document.createElementNS(S, "xf");
-    for (const attribute of Array.from(original.attributes))
-      clone.setAttribute(attribute.name, attribute.value);
-    for (const child of Array.from(original.childNodes))
-      clone.appendChild(child.cloneNode(true));
+    let borderId = borderVariants.get(edges);
+    if (borderId === undefined) {
+      borderId = String(borders.children.length);
+      const border = append(borders, S, "border");
+      for (const side of ["left", "right", "top", "bottom"]) {
+        const edge = append(border, S, side);
+        if (edges.includes(side)) {
+          edge.setAttribute("style", "thin");
+          append(edge, S, "color", { rgb: "FF000000" });
+        }
+      }
+      append(border, S, "diagonal");
+      borderVariants.set(edges, borderId);
+      borders.setAttribute("count", String(borders.children.length));
+    }
+    const clone = sourceStyle(sourceId).cloneNode(true);
+    if (!(clone instanceof Element)) throw new Error("Mẫu có định dạng ô không hợp lệ.");
     clone.setAttribute("borderId", borderId);
     clone.setAttribute("applyBorder", "1");
+    clone.setAttribute("applyAlignment", "1");
+    const alignment = descendants(clone, "alignment")[0] ?? append(clone, S, "alignment");
+    alignment.setAttribute("wrapText", "1");
+    alignment.removeAttribute("shrinkToFit");
+    if (body) alignment.setAttribute("vertical", "top");
     const id = String(xfs.children.length);
     xfs.appendChild(clone);
     xfs.setAttribute("count", String(xfs.children.length));
-    variants.set(index, id);
+    variants.set(key, id);
     return id;
   };
-  return { document, borderedStyle };
+  return { document, layoutStyle, fontSize };
 }
 
 export async function exportWorkbook(
@@ -794,6 +812,7 @@ export async function exportWorkbook(
     activeTab: "0",
   });
   const sheets = append(workbook.documentElement, S, "sheets");
+  const definedNames = append(workbook.documentElement, S, "definedNames");
   const relations = parseXml(`<Relationships xmlns="${P}"/>`);
   const parts = new Map<string, Uint8Array>(),
     copiedTypes = new Map<string, string>();
@@ -836,7 +855,9 @@ export async function exportWorkbook(
         cell,
         address(coord).row >= 9 ? "" : template.values.get(coord),
       );
+    const outputValues = new Map(template.values);
     const setCell = (coord: string, value: CellValue) => {
+      outputValues.set(coord, value);
       let cell = cells.get(coord);
       if (!cell) {
         const point = address(coord);
@@ -859,54 +880,102 @@ export async function exportWorkbook(
     setCell("C7", child.teacher);
     setCell("F7", child.manager);
     setCell("G6", `Tháng / Tuần${child.period ? `\n${child.period}` : ""}`);
-    for (const [i, planned] of child.lessons.entries()) {
-      const row = template.slots[i];
-      if (row === undefined) throw new Error("Vượt số hàng trong mẫu.");
-      const { lesson, fields, notes } = planned;
-      [
-        lesson.code,
-        fields.name,
-        fields.objective,
-        fields.instruction,
-        fields.score,
-        fields.criteria,
-      ].forEach((value, col) =>
-        setCell(`${String.fromCharCode(65 + col)}${row}`, value),
-      );
-      if (notes) setCell(`G${row}`, notes);
+    const widths = exportColumnWidths(child.lessons.map(({ lesson, fields, notes }) => [lesson.code, fields.name, fields.objective, fields.instruction, fields.score, fields.criteria, notes]));
+    const bodyHeights = new Map<number, number>();
+    const lessonMerges: string[] = [];
+    let nextRow = 9;
+    for (const { lesson, fields, notes } of child.lessons) {
+      const row = nextRow;
+      const values = [lesson.code, fields.name, fields.objective, fields.instruction, fields.score, fields.criteria, notes];
+      const height = Math.max(24, ...values.map((value, col) => {
+        const sourceId = cells.get(`${String.fromCharCode(65 + col)}${row}`)?.getAttribute("s") ?? null;
+        return wrappedCellHeight(value, widths[col] ?? 12, tableStyles.fontSize(sourceId));
+      }));
+      // Excel limits one physical row to 409 points. A taller lesson spans
+      // several merged rows so all text remains visible without shrinking it.
+      const span = Math.ceil(height / 400);
+      for (let offset = 0; offset < span; offset++) {
+        bodyHeights.set(row + offset, Math.ceil(height / span));
+        values.forEach((value, col) => setCell(`${String.fromCharCode(65 + col)}${row + offset}`, offset ? "" : value));
+      }
+      if (span > 1) {
+        for (let col = 0; col < 7; col++) {
+          const letter = String.fromCharCode(65 + col);
+          lessonMerges.push(`${letter}${row}:${letter}${row + span - 1}`);
+        }
+      }
+      nextRow += span;
     }
-    const occupied = new Set(template.slots.slice(0, child.lessons.length));
-    const lastLessonRow = template.slots.at(-1) ?? 8;
-    const defaultHeight = Number(
-      descendants(document, "sheetFormatPr")[0]?.getAttribute(
-        "defaultRowHeight",
-      ) ?? "15",
-    );
-    const normalHeight =
-      Number.isFinite(defaultHeight) && defaultHeight > 0 ? defaultHeight : 15;
+    const lastRow = nextRow - 1;
+    const range = `A1:G${lastRow}`;
+    descendants(document, "dimension")[0]?.setAttribute("ref", range);
+    const columns = descendants(document, "cols")[0];
+    if (columns) {
+      columns.replaceChildren();
+      widths.forEach((width, index) => append(columns, S, "col", { min: String(index + 1), max: String(index + 1), width: String(width), customWidth: "1" }));
+    }
+    // Lesson scores are independent, even if the source template merged them.
+    for (const merge of descendants(document, "mergeCell")) {
+      const points = (merge.getAttribute("ref") ?? "").split(":").map(address);
+      if (points.some(point => point.row >= 9 || point.col > 7)) merge.remove();
+    }
+    let mergeContainer = descendants(document, "mergeCells")[0];
+    if (!mergeContainer && lessonMerges.length) {
+      mergeContainer = document.createElementNS(S, "mergeCells");
+      const successor = Array.from(document.documentElement.children).find(element => ["phoneticPr", "conditionalFormatting", "dataValidations", "hyperlinks", "printOptions", "pageMargins", "pageSetup", "drawing", "extLst"].includes(element.localName));
+      document.documentElement.insertBefore(mergeContainer, successor ?? null);
+    }
+    if (mergeContainer) {
+      for (const ref of lessonMerges) append(mergeContainer, S, "mergeCell", { ref });
+      mergeContainer.setAttribute("count", String(mergeContainer.children.length));
+    }
+    const merges = descendants(document, "mergeCell").map(merge => (merge.getAttribute("ref") ?? "").split(":").map(address));
     for (const row of Array.from(data.children)) {
       const rowNumber = Number(row.getAttribute("r"));
-      if (rowNumber < 9 || rowNumber > lastLessonRow) continue;
-      row.setAttribute(
-        "ht",
-        String(occupied.has(rowNumber) ? 120 : normalHeight),
-      );
-      row.setAttribute("customHeight", "1");
+      if (rowNumber > lastRow) { row.remove(); continue; }
+      row.setAttribute("spans", "1:7");
       row.removeAttribute("hidden");
-      for (const column of ["A", "B", "C", "D", "E", "F", "G"]) {
-        const coord = `${column}${rowNumber}`;
+      for (const cell of Array.from(row.children)) {
+        if (address(cell.getAttribute("r") ?? "").col > 7) cell.remove();
+      }
+      let height = bodyHeights.get(rowNumber) ?? (rowNumber < 6 ? Number(row.getAttribute("ht") ?? 15) : 24);
+      for (let column = 1; column <= 7; column++) {
+        const coord = `${String.fromCharCode(64 + column)}${rowNumber}`;
         if (!cells.has(coord)) setCell(coord, "");
         const cell = cells.get(coord);
-        if (cell)
-          cell.setAttribute(
-            "s",
-            tableStyles.borderedStyle(cell.getAttribute("s")),
-          );
+        if (!cell) continue;
+        const sourceId = cell.getAttribute("s");
+        const edges = [column === 1 ? "left" : "", column === 7 ? "right" : "", rowNumber === 1 ? "top" : "", rowNumber === lastRow ? "bottom" : ""].join(" ");
+        cell.setAttribute("s", tableStyles.layoutStyle(sourceId, edges, rowNumber >= 9));
+        const value = outputValues.get(coord) ?? "";
+        const merged = merges.find(([start, end]) => start && end && start.row === rowNumber && start.col === column);
+        const start = merged?.[0], end = merged?.[1];
+        const width = start && end ? widths.slice(start.col - 1, end.col).reduce((sum, item) => sum + item, 0) : widths[column - 1] ?? 12;
+        const rowSpan = start && end ? end.row - start.row + 1 : 1;
+        height = Math.max(height, wrappedCellHeight(value, width, tableStyles.fontSize(sourceId)) / rowSpan);
       }
+      row.setAttribute("ht", String(Math.min(409, Math.ceil(height))));
+      row.setAttribute("customHeight", "1");
     }
+    for (const tag of ["conditionalFormatting", "dataValidations", "rowBreaks", "colBreaks", "autoFilter"]) {
+      for (const element of descendants(document, tag)) element.remove();
+    }
+    const setup = descendants(document, "pageSetup")[0];
+    setup?.setAttribute("fitToWidth", "1");
+    setup?.setAttribute("fitToHeight", "0");
+    setup?.removeAttribute("scale");
+    let properties = descendants(document, "sheetPr")[0];
+    if (!properties) {
+      properties = document.createElementNS(S, "sheetPr");
+      document.documentElement.insertBefore(properties, document.documentElement.firstChild);
+    }
+    const printProperties = descendants(properties, "pageSetUpPr")[0] ?? append(properties, S, "pageSetUpPr");
+    printProperties.setAttribute("fitToPage", "1");
+    append(definedNames, S, "definedName", { name: "_xlnm.Print_Area", localSheetId: String(index) }).textContent = `'${name.replace(/'/g, "''")}'!$A$1:$G$${lastRow}`;
     for (const view of descendants(document, "sheetView")) {
       view.removeAttribute("tabSelected");
       view.setAttribute("topLeftCell", "A1");
+      view.setAttribute("showGridLines", "0");
     }
     for (const selection of descendants(document, "selection")) {
       selection.setAttribute("activeCell", "A9");
