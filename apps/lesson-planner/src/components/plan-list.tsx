@@ -125,7 +125,6 @@ export function PlanList({
             <Plus aria-hidden="true" /> Tạo kế hoạch mới
           </Button>
         </div>
-        <p className="mb-4 text-xs text-muted-foreground">Số lượt xuất được ghi nhận khi tải file hoặc lưu vào thư mục. Mở hộp thoại xuất chưa được tính.</p>
         {notice && <p role="status" className="mb-3 text-sm text-primary">{notice}</p>}
         <Card className="page-section gap-0 overflow-hidden py-0" aria-label="Kế hoạch đã lưu">
           <TableToolbar label="Công cụ danh sách kế hoạch" title={<>Kế hoạch đã lưu{state.kind === "ready" && <span className="ml-2 font-normal text-muted-foreground">({plans.length})</span>}</>} search={{ label: "Tìm kế hoạch", placeholder: "Tên kế hoạch hoặc tháng/năm…", value: query, change: setQuery }} />

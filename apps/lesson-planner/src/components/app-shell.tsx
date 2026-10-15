@@ -63,12 +63,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     <NavigationContext.Provider value={{ navigate, guard }}>
       <div className="app-frame md:flex">
         <aside className={`app-sidebar ${expanded ? "is-expanded" : "is-collapsed"}`}>
-          <div className="sidebar-toggle"><Button variant="ghost" size={expanded ? "default" : "icon"} aria-label={expanded ? "Thu gọn sidebar" : "Mở rộng sidebar"} aria-expanded={expanded} aria-controls="main-navigation" title={expanded ? "Thu gọn" : "Mở rộng"} onClick={() => setExpanded(value => !value)}>{expanded ? <PanelLeftClose aria-hidden="true" /> : <PanelLeftOpen aria-hidden="true" />}{expanded && <span>Thu gọn</span>}</Button></div>
-          <div className="app-logo"><SunflowerLogo /><span className={expanded ? "" : "sr-only"}>Hoasalbee</span></div>
+          <div className="sidebar-header">
+            <div className="app-logo"><SunflowerLogo /><span className={expanded ? "" : "sr-only"}>Hoasalbee</span></div>
+            <div className="sidebar-toggle"><Button variant="ghost" size="icon" className="size-7 rounded-full bg-card" aria-label={expanded ? "Thu gọn sidebar" : "Mở rộng sidebar"} aria-expanded={expanded} aria-controls="main-navigation" title={expanded ? "Thu gọn" : "Mở rộng"} onClick={() => setExpanded(value => !value)}>{expanded ? <PanelLeftClose aria-hidden="true" /> : <PanelLeftOpen aria-hidden="true" />}</Button></div>
+          </div>
           <nav
             id="main-navigation"
             aria-label="Điều hướng chính"
-            className="flex gap-1 px-3 pb-3 md:flex-col"
+            className="flex gap-1 px-3 py-4 md:flex-col"
           >
             {items.map((item) => (
               <Link
