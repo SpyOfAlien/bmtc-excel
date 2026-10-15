@@ -65,7 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <aside className={`app-sidebar ${expanded ? "is-expanded" : "is-collapsed"}`}>
           <div className="sidebar-header">
             <div className="app-logo"><SunflowerLogo /><span className={expanded ? "" : "sr-only"}>Hoasalbee</span></div>
-            <div className="sidebar-toggle"><Button variant="ghost" size="icon" className="size-7 rounded-full bg-card" aria-label={expanded ? "Thu gọn sidebar" : "Mở rộng sidebar"} aria-expanded={expanded} aria-controls="main-navigation" title={expanded ? "Thu gọn" : "Mở rộng"} onClick={() => setExpanded(value => !value)}>{expanded ? <PanelLeftClose aria-hidden="true" /> : <PanelLeftOpen aria-hidden="true" />}</Button></div>
+            <div className="sidebar-toggle"><Button variant="ghost" size="icon" className="size-7 rounded-full" aria-label={expanded ? "Thu gọn sidebar" : "Mở rộng sidebar"} aria-expanded={expanded} aria-controls="main-navigation" title={expanded ? "Thu gọn" : "Mở rộng"} onClick={() => setExpanded(value => !value)}>{expanded ? <PanelLeftClose aria-hidden="true" /> : <PanelLeftOpen aria-hidden="true" />}</Button></div>
           </div>
           <nav
             id="main-navigation"

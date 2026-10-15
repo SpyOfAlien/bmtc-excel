@@ -233,7 +233,7 @@
 /* Shared dashboard layout and compact controls. */
 @layer components {
   .app-frame { @apply min-h-dvh w-full bg-background; }
-  .app-sidebar { @apply border-b bg-card md:sticky md:top-0 md:h-dvh md:w-52 md:shrink-0 md:border-b-0; }
+  .app-sidebar { @apply border-b bg-card md:sticky md:top-0 md:h-dvh md:w-52 md:shrink-0 md:border-r md:border-b-0; }
   .app-logo { @apply flex items-center gap-2.5 px-5 py-6 text-lg font-semibold tracking-tight; }
   .app-logo-mark { @apply size-8 shrink-0; }
   .sidebar-link { @apply flex items-center gap-3 rounded-lg px-3 py-3 text-[13px] text-muted-foreground transition-colors hover:bg-muted; }
