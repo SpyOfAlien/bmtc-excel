@@ -79,6 +79,13 @@ const theme = themeQuartz.withParams({
 });
 const message = (error: unknown) =>
   error instanceof Error ? error.message : "Không thể xử lý workbook.";
+/** Saved plans are written back once editing has paused for this long. */
+const AUTOSAVE_DELAY = 3000;
+type AutosaveState =
+  | { kind: "idle" }
+  | { kind: "saving" }
+  | { kind: "saved"; at: string }
+  | { kind: "error"; error: string };
 
 
 function Header({
@@ -87,9 +94,11 @@ function Header({
   busy = false,
   children,
   leadingAction,
+  saveStatus,
 }: {
   children?: ReactNode;
   leadingAction?: ReactNode;
+  saveStatus?: ReactNode;
   saveAction: () => void;
   exportAction?: () => void;
   busy?: boolean;
@@ -98,6 +107,7 @@ function Header({
     <div role="toolbar" aria-label="Thao tác kế hoạch" className="page-toolbar planner-toolbar">
       {children}
       <div className="toolbar-actions flex shrink-0 items-center gap-2">
+        {saveStatus}
         {leadingAction}
         <Button onClick={saveAction} disabled={busy}><Save aria-hidden="true" />Lưu giáo án</Button>
         <Button variant="outline" onClick={exportAction} disabled={!exportAction || busy}>
@@ -246,6 +256,11 @@ function Workspace({
     title: initialPlan?.plan.title ?? "",
     revision: initialPlan?.revision ?? 0,
   }));
+  // Saves run one at a time and read the latest revision from this ref, so a
+  // manual save queued behind an autosave does not hit a revision conflict.
+  const identityRef = useRef(planIdentity);
+  const saveQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const [autosave, setAutosave] = useState<AutosaveState>({ kind: "idle" });
   const refreshLessons = useCallback(async () => {
     try {
       setCustomLessons(await listLessons());
@@ -278,6 +293,8 @@ function Workspace({
     month: initialPlan?.plan.month ?? loaded.month,
     year: initialPlan?.plan.year ?? loaded.year,
   });
+  const periodRef = useRef(period);
+  periodRef.current = period;
   const [baseline, setBaseline] = useState({ children, period });
   const hasUnsaved =
     children !== baseline.children ||
@@ -682,10 +699,12 @@ function Workspace({
       if (importInput.current) importInput.current.value = "";
     }
   }
-  async function persistPlan(title: string, savedPeriod = period) {
-    const current = savedPeriod.month === period.month && savedPeriod.year === period.year
-      ? childrenRef.current
-      : childrenRef.current.map(child => ({ ...child, period: `Tháng ${savedPeriod.month}/${savedPeriod.year}` }));
+  function queueSave<T>(task: () => Promise<T>): Promise<T> {
+    const run = saveQueue.current.catch(() => undefined).then(task);
+    saveQueue.current = run;
+    return run;
+  }
+  async function writePlan(title: string, current: ChildDraft[], savedPeriod: { month: number; year: number }) {
     const chosen = new Set(
       current.flatMap((child) =>
         child.lessons.flatMap((row) => (row.lessonId ? [row.lessonId] : [])),
@@ -696,26 +715,67 @@ function Workspace({
     );
     const result = await savePlan({
       schemaVersion: 1,
-      id: planIdentity.id,
+      id: identityRef.current.id,
       title,
       month: savedPeriod.month,
       year: savedPeriod.year,
       children: current,
       lessons: snapshots,
-      expectedRevision: planIdentity.revision,
+      expectedRevision: identityRef.current.revision,
     });
-    setPlanIdentity({
+    identityRef.current = {
       id: result.plan.id,
       title: result.plan.title,
       revision: result.revision,
-    });
-    setChildren(current);
-    setPeriod(savedPeriod);
-    setBaseline({ children: current, period: savedPeriod });
-    setPlanSaveDialog(false);
-    setToast("Đã lưu giáo án. Bạn có thể mở lại từ danh sách Kế hoạch.");
-    return current;
+    };
+    setPlanIdentity(identityRef.current);
+    return result;
   }
+  function persistPlan(title: string, savedPeriod = period) {
+    return queueSave(async () => {
+      const current = savedPeriod.month === period.month && savedPeriod.year === period.year
+        ? childrenRef.current
+        : childrenRef.current.map(child => ({ ...child, period: `Tháng ${savedPeriod.month}/${savedPeriod.year}` }));
+      const result = await writePlan(title, current, savedPeriod);
+      setChildren(current);
+      setPeriod(savedPeriod);
+      setBaseline({ children: current, period: savedPeriod });
+      setAutosave({ kind: "saved", at: result.updatedAt });
+      setPlanSaveDialog(false);
+      setToast("Đã lưu giáo án. Bạn có thể mở lại từ danh sách Kế hoạch.");
+      return current;
+    });
+  }
+  const savedOnce = planIdentity.revision > 0;
+  // Autosave saved plans once editing pauses. Edits made while the request is
+  // in flight are newer than the snapshot, so they stay unsaved for the next run.
+  useEffect(() => {
+    if (!hasUnsaved || !savedOnce) return;
+    const timer = setTimeout(() => {
+      const snapshot = childrenRef.current, savedPeriod = periodRef.current;
+      setAutosave({ kind: "saving" });
+      void queueSave(() => writePlan(identityRef.current.title, snapshot, savedPeriod)).then(
+        (result) => {
+          setBaseline({ children: snapshot, period: savedPeriod });
+          setAutosave({ kind: "saved", at: result.updatedAt });
+        },
+        (error: unknown) => setAutosave({ kind: "error", error: message(error) }),
+      );
+    }, AUTOSAVE_DELAY);
+    return () => clearTimeout(timer);
+    // writePlan and queueSave only read refs and stable setters.
+  }, [children, period, hasUnsaved, savedOnce]);
+  const saveStatus = !savedOnce ? (
+    <span className="autosave-status">Lưu lần đầu để bật tự động lưu</span>
+  ) : autosave.kind === "saving" ? (
+    <span className="autosave-status" role="status">Đang lưu…</span>
+  ) : autosave.kind === "error" ? (
+    <span className="autosave-status is-error" role="alert" title={autosave.error}>Chưa tự động lưu được</span>
+  ) : hasUnsaved ? (
+    <span className="autosave-status">Có thay đổi chưa lưu</span>
+  ) : autosave.kind === "saved" ? (
+    <span className="autosave-status">Đã lưu lúc {new Date(autosave.at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</span>
+  ) : null;
   function openExport() {
     try {
       validatePlans(template, children);
@@ -728,7 +788,7 @@ function Workspace({
   return (
     <>
       <main className="dashboard-page planner-shell">
-      <Header saveAction={() => setPlanSaveDialog(true)} exportAction={openExport} leadingAction={
+      <Header saveAction={() => setPlanSaveDialog(true)} exportAction={openExport} saveStatus={saveStatus} leadingAction={
         <Button variant="outline" disabled={importing} onClick={() => importInput.current?.click()}>{importing ? "Đang tải…" : "Tải kế hoạch có sẵn"}</Button>
       }>
         <div className="workspace-heading">
