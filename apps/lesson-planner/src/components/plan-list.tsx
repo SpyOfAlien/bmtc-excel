@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { currentUser, listPlans, loadPlan, extendTemplate, recordExport, savePlan } from "../lib/storage-client";
+import { currentUser, deletePlan, listPlans, loadPlan, extendTemplate, recordExport, savePlan } from "../lib/storage-client";
 import type {
   PlanSummary,
   SavedPlan,
   UserProfile,
 } from "../lib/storage-schema";
-import { FileText, Plus, Download, Copy } from "lucide-react";
+import { FileText, Plus, Download, Copy, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { TableToolbar } from "./table-toolbar";
 import { ExportPlanDialog } from "./export-plan-dialog";
@@ -16,6 +16,7 @@ import { validatePlans } from "@/lib/workbook";
 import { planEditPath } from "@/lib/plan-routes";
 import { copyPlan } from "@/lib/plan-utils";
 import { Card } from "./ui/card";
+import { Modal } from "./planner-modal";
 
 const message = (error: unknown) =>
   error instanceof Error ? error.message : "Không tải được danh sách kế hoạch.";
@@ -39,6 +40,8 @@ export function PlanList({
   const [query, setQuery] = useState("");
   const [opening, setOpening] = useState<string | null>(null);
   const [openError, setOpenError] = useState("");
+  const [removing, setRemoving] = useState<PlanSummary | null>(null);
+  const [removeError, setRemoveError] = useState("");
   const refresh = useCallback(
     async (cancelled: () => boolean = () => false) => {
       setState({ kind: "loading" });
@@ -97,6 +100,22 @@ export function PlanList({
       setNotice(`Đã sao chép thành "${saved.plan.title}". Mở bản sao để chỉnh sửa.`);
     } catch (error) {
       setOpenError(message(error));
+    } finally {
+      setOpening(null);
+    }
+  }
+  async function removePlan(plan: PlanSummary) {
+    if (opening) return;
+    setOpening(plan.id);
+    setRemoveError("");
+    try {
+      await deletePlan(plan.id);
+      setState(current => current.kind === "ready" ? { ...current, plans: current.plans.filter(item => item.id !== plan.id) } : current);
+      setRemoving(null);
+      setOpenError("");
+      setNotice(`Đã xóa kế hoạch "${plan.title}".`);
+    } catch (error) {
+      setRemoveError(message(error));
     } finally {
       setOpening(null);
     }
@@ -200,7 +219,8 @@ export function PlanList({
                       <td className="px-5 py-4"><span className="rounded-md bg-accent px-2 py-1 text-xs text-primary">{plan.exportCount}</span></td>
                       <td className="px-5 py-4 text-right"><div className="flex justify-end gap-2">
                         <Button variant="outline" size="sm" disabled={opening !== null} aria-label={`Sao chép kế hoạch ${plan.title}`} onClick={() => void duplicatePlan(plan.id)}><Copy aria-hidden="true" />Sao chép</Button>
-                        <Button variant="outline" size="sm" disabled={opening !== null} aria-label={`Xuất Excel ${plan.title}`} onClick={() => void exportPlan(plan.id)}><Download aria-hidden="true" />Xuất Excel</Button></div>
+                        <Button variant="outline" size="sm" disabled={opening !== null} aria-label={`Xuất Excel ${plan.title}`} onClick={() => void exportPlan(plan.id)}><Download aria-hidden="true" />Xuất Excel</Button>
+                        <Button variant="outline" size="sm" className="text-destructive hover:text-destructive" disabled={opening !== null} aria-label={`Xóa kế hoạch ${plan.title}`} onClick={() => { setRemoveError(""); setRemoving(plan); }}><Trash2 aria-hidden="true" />Xóa</Button></div>
                       </td>
                     </tr>
                   ))}
@@ -227,6 +247,20 @@ export function PlanList({
         const result = await recordExport(exporting.plan.id, eventId);
         setState(current => current.kind === "ready" ? { ...current, plans: current.plans.map(plan => plan.id === exporting.plan.id ? { ...plan, exportCount: result.exportCount } : plan) } : current);
       }} saved={message => { setNotice(message); setExporting(null); }} />}
+      {removing && (
+        <Modal title="Xóa kế hoạch?" close={() => { if (opening !== removing.id) setRemoving(null); }}>
+          <p className="text-sm">
+            Kế hoạch <strong>{removing.title}</strong> ({removing.month}/{removing.year}) và lịch sử {removing.exportCount} lượt xuất sẽ bị xóa vĩnh viễn. Không thể hoàn tác.
+          </p>
+          {removeError && <p role="alert" className="text-sm text-destructive">{removeError}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" disabled={opening === removing.id} onClick={() => setRemoving(null)}>Hủy</Button>
+            <Button variant="destructive" disabled={opening === removing.id} onClick={() => void removePlan(removing)}>
+              <Trash2 aria-hidden="true" />{opening === removing.id ? "Đang xóa…" : "Xóa kế hoạch"}
+            </Button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }

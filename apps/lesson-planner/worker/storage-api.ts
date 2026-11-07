@@ -399,6 +399,21 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
         }
         return json({ plan: saved, revision, updatedAt: now });
       }
+      if (request.method === "DELETE") {
+        const owned = await db
+          .prepare("SELECT 1 FROM plans WHERE id = ? AND user_id = ?")
+          .bind(id, FIXED_USER_ID)
+          .first();
+        if (!owned) return json({ error: "Không tìm thấy giáo án." }, 404);
+        // Export events reference the plan, so they go in the same batch.
+        await db.batch([
+          db.prepare("DELETE FROM plan_exports WHERE plan_id = ?").bind(id),
+          db
+            .prepare("DELETE FROM plans WHERE id = ? AND user_id = ?")
+            .bind(id, FIXED_USER_ID),
+        ]);
+        return json({ id });
+      }
     }
     return json({ error: "Không tìm thấy chức năng." }, 404);
   } catch (error) {

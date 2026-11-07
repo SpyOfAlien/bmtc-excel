@@ -46,6 +46,10 @@ export const createLesson = (lesson: Lesson) =>
 export const listPlans = () => request("/api/plans", planListSchema);
 export const loadPlan = (id: string) =>
   request(`/api/plans/${encodeURIComponent(id)}`, savedPlanSchema);
+export const deletePlan = (id: string) =>
+  request(`/api/plans/${encodeURIComponent(id)}`, z.object({ id: z.string() }), {
+    method: "DELETE",
+  });
 export const savePlan = (plan: PlanInput) => {
   const validated = planInputSchema.parse(plan);
   return request(`/api/plans/${validated.id}`, savedPlanSchema, {

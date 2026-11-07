@@ -122,6 +122,18 @@ describe("D1 storage", () => {
     expect((await call(`plans/${crypto.randomUUID()}/exports`, "POST", { id: crypto.randomUUID() })).status).toBe(404);
   });
 
+  it("deletes a plan together with its export history", async () => {
+    const doomed = { ...plan, id: crypto.randomUUID(), title: "Giáo án xóa" };
+    expect((await call(`plans/${doomed.id}`, "PUT", doomed)).status).toBe(200);
+    expect((await call(`plans/${doomed.id}/exports`, "POST", { id: crypto.randomUUID() })).status).toBe(200);
+    const deleted = await call(`plans/${doomed.id}`, "DELETE");
+    expect(deleted.status).toBe(200);
+    expect(await deleted.json()).toEqual({ id: doomed.id });
+    expect((await call(`plans/${doomed.id}`)).status).toBe(404);
+    expect(planListSchema.parse(await (await call("plans")).json()).some(item => item.id === doomed.id)).toBe(false);
+    expect((await call(`plans/${doomed.id}`, "DELETE")).status).toBe(404);
+    expect((await call(`plans/${plan.id}`)).status).toBe(200);
+  });
   it("updates shared student profiles, rejects stale changes and preserves plan snapshots", async () => {
     const response = await call("students", "POST", { id: crypto.randomUUID(), name: "Bé chỉnh sửa", age: "5 tuổi" });
     const student = studentSchema.parse(await response.json());
