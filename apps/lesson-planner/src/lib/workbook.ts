@@ -339,6 +339,24 @@ function workbookCellReader(parts: Map<string, Uint8Array>) {
     readCells(document, strings, dateStyles, epoch);
 }
 
+/** Cells of a workbook's first sheet: as stored, and with merged ranges in A:F filled in. */
+export function readFirstSheet(data: Uint8Array): {
+  raw: Map<string, CellValue>;
+  filled: Map<string, CellValue>;
+} {
+  const parts = unpackWorkbook(data);
+  const workbook = xmlPart(parts, "xl/workbook.xml"),
+    relations = xmlPart(parts, "xl/_rels/workbook.xml.rels");
+  const id = descendants(workbook, "sheet")[0]?.getAttributeNS(R, "id");
+  const target = descendants(relations, "Relationship", P)
+    .find((relation) => relation.getAttribute("Id") === id)
+    ?.getAttribute("Target");
+  if (!target) throw new Error("Tệp Excel không có sheet nào.");
+  const sheet = xmlPart(parts, targetPath("xl/workbook.xml", target));
+  const raw = workbookCellReader(parts)(sheet);
+  return { raw, filled: fillMerged(sheet, raw) };
+}
+
 /** The file is parsed on the user's device. No request contains workbook data. */
 export function readTemplate(data: Uint8Array): Template {
   const parts = unpackWorkbook(data);

@@ -43,6 +43,12 @@ export const createLesson = (lesson: Lesson) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(lesson),
   });
+export const createLessons = (lessons: Lesson[]) =>
+  request("/api/lessons/batch", lessonListSchema, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(lessons),
+  });
 export const listPlans = () => request("/api/plans", planListSchema);
 export const loadPlan = (id: string) =>
   request(`/api/plans/${encodeURIComponent(id)}`, savedPlanSchema);

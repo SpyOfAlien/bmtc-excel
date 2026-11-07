@@ -5,7 +5,7 @@ import { getPlatformProxy } from "wrangler";
 import type { D1Database } from "@cloudflare/workers-types";
 import { handleApi, FIXED_USER_ID } from "../worker/storage-api";
 import type { Env } from "../worker/storage-api";
-import { lessonSchema, planListSchema, savedPlanSchema, userSchema, studentSchema, studentListSchema, exportCountSchema } from "../src/lib/storage-schema";
+import { lessonSchema, lessonListSchema, planListSchema, savedPlanSchema, userSchema, studentSchema, studentListSchema, exportCountSchema } from "../src/lib/storage-schema";
 import type { PlanInput } from "../src/lib/storage-schema";
 
 const legacyOwner = crypto.randomUUID(), legacyLesson = crypto.randomUUID();
@@ -54,6 +54,22 @@ describe("D1 storage", () => {
     expect(lessonSchema.array().parse(rows)).toEqual([lesson]);
     const stored = await env.DB?.prepare("SELECT user_id FROM lessons WHERE id = ?").bind(lesson.id).first<{ user_id: string }>();
     expect(stored?.user_id).toBe(FIXED_USER_ID);
+  });
+  it("imports a batch of lessons all at once or not at all", async () => {
+    const make = (code: string) => ({ ...lesson, id: crypto.randomUUID(), code, name: `Bài ${code}`, scores: lesson.scores.map(score => ({ ...score, id: crypto.randomUUID() })) });
+    const batch = [make("NHAP1"), make("NHAP2")];
+    const created = await call("lessons/batch", "POST", batch);
+    expect(created.status).toBe(201);
+    expect(lessonListSchema.parse(await created.json()).map(item => item.code)).toEqual(["NHAP1", "NHAP2"]);
+    const failing = await call("lessons/batch", "POST", [make("NHAP3"), make("nhap 1")]);
+    expect(failing.status).toBe(409);
+    expect(await failing.json()).toEqual({ error: "Một số mã bài đã có trong thư viện. Tải lại trang rồi nhập lại." });
+    const stored = lessonListSchema.parse(await (await call("lessons")).json()).map(item => item.code);
+    expect(stored).toEqual(expect.arrayContaining(["NHAP1", "NHAP2"]));
+    expect(stored).not.toContain("NHAP3");
+    expect((await call("lessons/batch", "POST", [make("A1")])).status).toBe(409);
+    expect((await call("lessons/batch", "POST", [make("NHAP4"), make("nhap4")])).status).toBe(409);
+    expect((await call("lessons/batch", "POST", [])).status).toBe(400);
   });
   it("saves, opens and updates a complete snapshot without losing notes", async () => {
     const first = await call(`plans/${plan.id}`, "PUT", plan);

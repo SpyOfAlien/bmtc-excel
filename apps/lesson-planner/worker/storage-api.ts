@@ -43,9 +43,10 @@ const summaryRow = z.object({
 const MAX_BODY = 1800000;
 const json = (value: unknown, status = 200) =>
   Response.json(value, { status, headers: { "Cache-Control": "no-store" } });
-async function readBody(request: Request): Promise<unknown> {
+const PLAN_TOO_LARGE = "Giáo án quá lớn. Hãy chia thành các giáo án nhỏ hơn.";
+async function readBody(request: Request, tooLarge = PLAN_TOO_LARGE): Promise<unknown> {
   if (Number(request.headers.get("Content-Length") ?? 0) > MAX_BODY)
-    throw new Error("Giáo án quá lớn. Hãy chia thành các giáo án nhỏ hơn.");
+    throw new Error(tooLarge);
   const reader = request.body?.getReader();
   if (!reader) throw new Error("Thiếu dữ liệu.");
   const chunks: Uint8Array[] = [];
@@ -56,7 +57,7 @@ async function readBody(request: Request): Promise<unknown> {
     length += value.byteLength;
     if (length > MAX_BODY) {
       await reader.cancel();
-      throw new Error("Giáo án quá lớn. Hãy chia thành các giáo án nhỏ hơn.");
+      throw new Error(tooLarge);
     }
     chunks.push(value);
   }
@@ -279,6 +280,39 @@ export async function handleApi(request: Request, env: Env): Promise<Response> {
         throw error;
       }
       return json(lesson, 201);
+    }
+    if (path === "/api/lessons/batch" && request.method === "POST") {
+      const lessons = z
+        .array(newLessonSchema)
+        .min(1, "Không có bài nào để nhập.")
+        .max(500, "Mỗi lần chỉ nhập tối đa 500 bài.")
+        .parse(await readBody(request, "Tệp bài học quá lớn. Hãy chia thành nhiều tệp nhỏ hơn."));
+      const keys = lessons.map((lesson) => normalizeCode(lesson.code));
+      const reserved = lessons.find(
+        (lesson, index) => baseCodes.has(keys[index] ?? "") || baseIds.has(lesson.id),
+      );
+      if (reserved)
+        return json({ error: `Mã bài ${reserved.code} đã có trong danh mục gốc.` }, 409);
+      if (new Set(keys).size !== keys.length)
+        return json({ error: "Có mã bài bị lặp trong danh sách nhập." }, 409);
+      const now = new Date().toISOString();
+      // One batch is one transaction: either every lesson is added or none is.
+      try {
+        await db.batch(
+          lessons.map((lesson, index) =>
+            db
+              .prepare(
+                "INSERT INTO lessons(id, user_id, code_key, payload, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+              )
+              .bind(lesson.id, FIXED_USER_ID, keys[index], JSON.stringify(lesson), now, now),
+          ),
+        );
+      } catch (error) {
+        if (error instanceof Error && /UNIQUE constraint/i.test(error.message))
+          return json({ error: "Một số mã bài đã có trong thư viện. Tải lại trang rồi nhập lại." }, 409);
+        throw error;
+      }
+      return json(lessons, 201);
     }
     if (path === "/api/plans" && request.method === "GET") {
       const result = await db

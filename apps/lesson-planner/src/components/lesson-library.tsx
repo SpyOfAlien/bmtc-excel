@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { bundledTemplate } from "@/lib/bundled-template";
 import { extendTemplate, listLessons } from "@/lib/storage-client";
+import { normalize } from "@/lib/workbook";
 import type { Lesson } from "@/lib/workbook";
 import { NewLessonDialog } from "./storage-dialogs";
+import { ImportLessonsDialog } from "./lesson-import-dialog";
 import { groupLessons } from "@/lib/lesson-groups";
-import { Search, Plus } from "lucide-react";
+import { Search, Plus, FileSpreadsheet } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -25,7 +27,9 @@ export function LessonLibrary() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [notice, setNotice] = useState("");
   const [groupFilter, setGroupFilter] = useState<GroupFilter>({ kind: "all" });
   const refresh = useCallback(
     async (cancelled: () => boolean = () => false) => {
@@ -71,6 +75,16 @@ export function LessonLibrary() {
   const selected = catalog.find(lesson => lesson.id === selectedId) ?? null;
   const selectedGroupCount = groups.filter(group => isGroupSelected(group.name)).length;
   const allChecked = selectedGroupCount === groups.length;
+  /** Add new lessons to the list and keep them visible under the current filters. */
+  function showAdded(added: Lesson[]) {
+    setCustom(all => [...all, ...added]);
+    const ids = new Set(added.map(lesson => lesson.id));
+    const newGroups = groupLessons([...catalog, ...added]).filter(group => group.lessons.some(item => ids.has(item.id))).map(group => group.name);
+    setGroupFilter(current => current.kind === "all" ? current : { kind: "selected", groups: new Set([...current.groups, ...newGroups]) });
+    setQuery("");
+    setGroupQuery("");
+    setError("");
+  }
   function toggleGroup(group: string, checked: boolean) {
     setGroupFilter(current => {
       const next = current.kind === "all" ? new Set(groups.map(item => item.name)) : new Set(current.groups);
@@ -81,7 +95,8 @@ export function LessonLibrary() {
   return (
     <main className="dashboard-page library-page">
       <h1 className="sr-only">Thư viện bài học</h1>
-      <TableToolbar label="Công cụ thư viện" className="mb-1" title={<span className="font-normal text-muted-foreground">{lessons.length} / {catalog.length} bài học</span>} search={{ label: "Tìm bài học", placeholder: "Mã bài, tên hoặc mục tiêu…", value: query, change: value => { setQuery(value); setSelectedId(null); } }} actions={<Button className="h-9 shrink-0" onClick={() => setAdding(true)}><Plus aria-hidden="true" />Thêm bài mẫu</Button>} />
+      <TableToolbar label="Công cụ thư viện" className="mb-1" title={<span className="font-normal text-muted-foreground">{lessons.length} / {catalog.length} bài học</span>} search={{ label: "Tìm bài học", placeholder: "Mã bài, tên hoặc mục tiêu…", value: query, change: value => { setQuery(value); setSelectedId(null); } }} actions={<div className="flex shrink-0 gap-2"><Button variant="outline" className="h-9" onClick={() => setImporting(true)}><FileSpreadsheet aria-hidden="true" />Nhập từ Excel</Button><Button className="h-9" onClick={() => setAdding(true)}><Plus aria-hidden="true" />Thêm bài mẫu</Button></div>} />
+      {notice && <p role="status" className="mb-2 text-sm text-primary">{notice}</p>}
       {loading && (
         <p role="status" className="mb-4 text-sm">
           Đang tải bài tự thêm…
@@ -144,13 +159,13 @@ export function LessonLibrary() {
         </DialogContent>
       </Dialog>}
       {adding && <NewLessonDialog close={() => setAdding(false)} saved={lesson => {
-        setCustom(all => [...all, lesson]);
-        const newGroup = groupLessons([...catalog, lesson]).find(group => group.lessons.some(item => item.id === lesson.id));
-        setGroupFilter(current => current.kind === "all" ? current : { kind: "selected", groups: new Set([...current.groups, ...(newGroup ? [newGroup.name] : [])]) });
-        setQuery("");
-        setGroupQuery("");
+        showAdded([lesson]);
         setAdding(false);
-        setError("");
+      }} />}
+      {importing && <ImportLessonsDialog existingCodes={new Set(catalog.map(lesson => normalize(lesson.code)))} close={() => setImporting(false)} saved={lessons => {
+        showAdded(lessons);
+        setImporting(false);
+        setNotice(`Đã nhập ${lessons.length} bài từ Excel.`);
       }} />}
     </main>
   );
